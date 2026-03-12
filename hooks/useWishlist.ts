@@ -5,25 +5,22 @@ import { Event } from '@/lib/api'
 
 export function useWishlist() {
   const [wishlist, setWishlist] = useState<Event[]>([])
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
     try {
       const saved = localStorage.getItem('tf-wishlist')
       if (saved) setWishlist(JSON.parse(saved))
     } catch {}
   }, [])
 
-  const save = (items: Event[]) => {
-    setWishlist(items)
-    localStorage.setItem('tf-wishlist', JSON.stringify(items))
-    window.dispatchEvent(new Event('wishlistChange'))
-  }
-
   const addToWishlist = useCallback((event: Event) => {
     setWishlist(prev => {
       if (prev.find(e => e.id === event.id)) return prev
       const next = [...prev, event]
-      localStorage.setItem('tf-wishlist', JSON.stringify(next))
+      if (typeof window !== 'undefined')
+        localStorage.setItem('tf-wishlist', JSON.stringify(next))
       window.dispatchEvent(new Event('wishlistChange'))
       return next
     })
@@ -32,7 +29,8 @@ export function useWishlist() {
   const removeFromWishlist = useCallback((eventId: number) => {
     setWishlist(prev => {
       const next = prev.filter(e => e.id !== eventId)
-      localStorage.setItem('tf-wishlist', JSON.stringify(next))
+      if (typeof window !== 'undefined')
+        localStorage.setItem('tf-wishlist', JSON.stringify(next))
       window.dispatchEvent(new Event('wishlistChange'))
       return next
     })
@@ -50,5 +48,5 @@ export function useWishlist() {
     }
   }, [wishlist, addToWishlist, removeFromWishlist])
 
-  return { wishlist, addToWishlist, removeFromWishlist, isWishlisted, toggleWishlist }
+  return { wishlist, addToWishlist, removeFromWishlist, isWishlisted, toggleWishlist, mounted }
 }
