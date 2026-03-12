@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { paymentAPI } from '@/lib/api'
@@ -13,7 +13,7 @@ declare global {
   }
 }
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -194,5 +194,17 @@ export default function CheckoutPage() {
         </div>
       </div>
     </>
+  )
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-black flex items-center justify-center text-gray-400">
+        Loading...
+      </div>
+    }>
+      <CheckoutContent />
+    </Suspense>
   )
 }
