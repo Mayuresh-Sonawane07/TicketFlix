@@ -57,14 +57,10 @@ export default function BookingsPage() {
     }
   }
 
-  // Replace the handleDownloadTicket function in app/bookings/page.tsx with this:
-
   const handleDownloadTicket = async (booking: any) => {
     setGeneratingPDF(booking.id)
     try {
       const { jsPDF } = await import('jspdf')
-      const QRCode = await import('qrcode')
-
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
       const W = 210
       const pageH = 297
@@ -73,15 +69,6 @@ export default function BookingsPage() {
       const eventType = booking.show_details?.event?.event_type || 'EVENT'
       const showTime = booking.show_details?.show_time || ''
       const theaterName = booking.show_details?.theater_name || 'Venue'
-
-      // Generate real QR code
-      const verifyUrl = `${window.location.origin}/verify/${booking.id}?token=${booking.qr_token}`
-      const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
-        width: 200,
-        margin: 2,
-        color: { dark: '#dc2626', light: '#1e1e2e' },
-        errorCorrectionLevel: 'H',
-      })
 
       // Background
       doc.setFillColor(10, 10, 15)
@@ -194,20 +181,24 @@ export default function BookingsPage() {
         doc.text(`Transaction ID: ${booking.transaction_id}`, W / 2, 158, { align: 'center' })
       }
 
-      // Real QR Code
-      const qrY = 163
+      // QR placeholder
+      const qrY = 165
       doc.setFillColor(20, 20, 30)
-      doc.roundedRect(W / 2 - 27, qrY, 54, 60, 4, 4, 'F')
+      doc.roundedRect(W / 2 - 25, qrY, 50, 50, 4, 4, 'F')
       doc.setDrawColor(80, 80, 100)
       doc.setLineWidth(0.5)
-      doc.roundedRect(W / 2 - 27, qrY, 54, 60, 4, 4, 'S')
-      doc.addImage(qrDataUrl, 'PNG', W / 2 - 23, qrY + 4, 46, 46)
+      doc.roundedRect(W / 2 - 25, qrY, 50, 50, 4, 4, 'S')
+      doc.setFillColor(220, 38, 38)
+      ;[[0,0],[0,1],[0,2],[1,0],[2,0],[2,1],[2,2],[1,2],
+        [4,0],[5,0],[6,0],[4,1],[6,1],[4,2],[5,2],[6,2],
+        [0,4],[1,4],[2,4],[0,5],[2,5],[0,6],[1,6],[2,6],
+        [3,3],[4,4],[5,5],[3,5],[5,3]
+      ].forEach(([col, row]) => {
+        doc.rect(W/2 - 22 + col * 5, qrY + 7 + row * 5, 4, 4, 'F')
+      })
       doc.setFontSize(7)
       doc.setTextColor(100, 100, 120)
-      doc.text('Scan at Entry', W / 2, qrY + 54, { align: 'center' })
-      doc.setFontSize(6)
-      doc.setTextColor(80, 80, 100)
-      doc.text(`#TF${String(booking.id).padStart(6, '0')}`, W / 2, qrY + 58, { align: 'center' })
+      doc.text(`#TF${String(booking.id).padStart(6, '0')}`, W / 2, qrY + 46, { align: 'center' })
 
       // Footer
       doc.setFillColor(20, 20, 30)
@@ -220,7 +211,6 @@ export default function BookingsPage() {
 
       doc.save(`TicketFlix-Booking-${booking.id}.pdf`)
     } catch (err) {
-      console.error(err)
       alert('Failed to generate ticket. Please try again.')
     } finally {
       setGeneratingPDF(null)
