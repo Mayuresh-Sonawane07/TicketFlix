@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { bookingAPI, apiClient, Booking } from '@/lib/api'
 import { Ticket, CheckCircle, XCircle, Clock, Users, ChevronDown, ChevronUp, IndianRupee, Download } from 'lucide-react'
 
-export default function BookingsPage() {
+function BookingsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [bookings, setBookings] = useState<Booking[]>([])
@@ -449,5 +449,17 @@ export default function BookingsPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function BookingsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-black flex items-center justify-center text-gray-400">
+        Loading...
+      </div>
+    }>
+      <BookingsContent />
+    </Suspense>
   )
 }
