@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Event } from '@/lib/api'
+import type { Event } from '@/lib/api'
 
 export function useWishlist() {
   const [wishlist, setWishlist] = useState<Event[]>([])
