@@ -69,7 +69,8 @@ function BookingsContent() {
       const eventType = booking.show_details?.event?.event_type || 'EVENT'
       const showTime = booking.show_details?.show_time || ''
       const theaterName = booking.show_details?.theater_name || 'Venue'
-
+      const QRCode = await import('qrcode')
+      
       // Background
       doc.setFillColor(10, 10, 15)
       doc.rect(0, 0, W, pageH, 'F')
@@ -182,23 +183,27 @@ function BookingsContent() {
       }
 
       // QR placeholder
-      const qrY = 165
+      // Real QR Code
+      const verifyUrl = `${window.location.origin}/verify/${booking.id}?token=${booking.qr_token}`
+      const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
+        width: 200,
+        margin: 2,
+        color: { dark: '#000000', light: '#ffffff' },
+        errorCorrectionLevel: 'H',
+      })
+      const qrY = 163
       doc.setFillColor(20, 20, 30)
-      doc.roundedRect(W / 2 - 25, qrY, 50, 50, 4, 4, 'F')
+      doc.roundedRect(W / 2 - 27, qrY, 54, 60, 4, 4, 'F')
       doc.setDrawColor(80, 80, 100)
       doc.setLineWidth(0.5)
-      doc.roundedRect(W / 2 - 25, qrY, 50, 50, 4, 4, 'S')
-      doc.setFillColor(220, 38, 38)
-      ;[[0,0],[0,1],[0,2],[1,0],[2,0],[2,1],[2,2],[1,2],
-        [4,0],[5,0],[6,0],[4,1],[6,1],[4,2],[5,2],[6,2],
-        [0,4],[1,4],[2,4],[0,5],[2,5],[0,6],[1,6],[2,6],
-        [3,3],[4,4],[5,5],[3,5],[5,3]
-      ].forEach(([col, row]) => {
-        doc.rect(W/2 - 22 + col * 5, qrY + 7 + row * 5, 4, 4, 'F')
-      })
+      doc.roundedRect(W / 2 - 27, qrY, 54, 60, 4, 4, 'S')
+      doc.addImage(qrDataUrl, 'PNG', W / 2 - 23, qrY + 4, 46, 46)
       doc.setFontSize(7)
       doc.setTextColor(100, 100, 120)
-      doc.text(`#TF${String(booking.id).padStart(6, '0')}`, W / 2, qrY + 46, { align: 'center' })
+      doc.text('Scan at Entry', W / 2, qrY + 54, { align: 'center' })
+      doc.setFontSize(6)
+      doc.setTextColor(80, 80, 100)
+      doc.text(`#TF${String(booking.id).padStart(6, '0')}`, W / 2, qrY + 58, { align: 'center' })
 
       // Footer
       doc.setFillColor(20, 20, 30)
