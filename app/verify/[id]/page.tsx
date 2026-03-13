@@ -27,7 +27,7 @@ export default function VerifyTicketPage() {
 
   const verify = async () => {
     try {
-      const res = await apiClient.get(`/bookings/verify/${bookingId}/?token=${token}`)
+      const res = await apiClient.get(`/bookings/${bookingId}/verify/?token=${token}`)
       setResult(res.data)
     } catch (err: any) {
       const data = err.response?.data
