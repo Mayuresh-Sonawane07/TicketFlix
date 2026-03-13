@@ -151,7 +151,7 @@ function CheckoutContent() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">
-                    Convenience Fee (5%)
+                    Convenience Fee (2.75%)
                   </span>
                   <span className="text-white">₹{orderData.convenience_fee}</span>
                 </div>
