@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams, useParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { CheckCircle, XCircle, AlertCircle, Ticket, Clock, MapPin, User } from 'lucide-react'
 import { apiClient } from '@/lib/api'
 
-function VerifyTicketContent() {
+export default function VerifyTicketPage() {
   const params = useParams()
   const searchParams = useSearchParams()
   const bookingId = params.id
@@ -151,17 +151,5 @@ function VerifyTicketContent() {
         <p className="text-center text-gray-700 text-xs mt-4">TicketFlix Entry Verification System</p>
       </motion.div>
     </div>
-  )
-}
-
-export default function VerifyTicketPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-black flex items-center justify-center text-gray-400">
-        Loading...
-      </div>
-    }>
-      <VerifyTicketContent />
-    </Suspense>
   )
 }
