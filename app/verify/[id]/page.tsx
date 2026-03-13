@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams, useParams } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { CheckCircle, XCircle, AlertCircle, Ticket, Clock, MapPin, User } from 'lucide-react'
+import { CheckCircle, XCircle, AlertCircle, Ticket, Clock, MapPin, User, IndianRupee } from 'lucide-react'
 import { apiClient } from '@/lib/api'
 
 export default function VerifyTicketPage() {
@@ -144,7 +144,10 @@ export default function VerifyTicketPage() {
             {/* Amount */}
             <div className="pt-3 border-t border-gray-800 flex justify-between items-center">
               <span className="text-gray-400 text-sm">Amount Paid</span>
-              <span className="text-white font-bold">₹{result.amount_paid}</span>
+              <span className="text-white font-bold flex items-center gap-0.5">
+                <IndianRupee size={14} />
+                {result.total_amount}
+              </span>
             </div>
           </div>
         )}

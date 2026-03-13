@@ -145,7 +145,7 @@ function CheckoutContent() {
               <div className="space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">
-                    Ticket × {orderData.num_seats} (₹{orderData.show_price} each)
+                    Ticket × {orderData.num_seats}
                   </span>
                   <span className="text-white">₹{orderData.ticket_amount}</span>
                 </div>
