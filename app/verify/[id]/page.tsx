@@ -122,6 +122,7 @@ export default function VerifyTicketPage() {
                 <div>
                   <p className="text-gray-400 text-xs">Venue</p>
                   <p className="text-white text-sm font-medium">{result.venue}, {result.city}</p>
+                  <p className="text-gray-500 text-xs">Screen: {result.screen}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
