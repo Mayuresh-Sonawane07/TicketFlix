@@ -21,7 +21,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://www.googletagmanager.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://web-production-cf420.up.railway.app; connect-src 'self' https://web-production-cf420.up.railway.app https://www.google-analytics.com https://accounts.google.com; frame-src https://checkout.razorpay.com https://accounts.google.com; object-src 'none';"
+          "value": "default-src 'self'; script-src 'self' https://checkout.razorpay.com https://www.googletagmanager.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://web-production-cf420.up.railway.app; connect-src 'self' https://web-production-cf420.up.railway.app https://www.google-analytics.com https://accounts.google.com https://oauth2.googleapis.com; frame-src https://checkout.razorpay.com https://accounts.google.com; object-src 'none';"
         }
       ]
     }
