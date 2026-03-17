@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import Navigation from '@/components/Navigation'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import './globals.css'
+import { GoogleAnalytics } from '@next/third-parties/google'
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -64,6 +65,7 @@ export default function RootLayout({
           <Navigation />
           {children}
         </ThemeProvider>
+        <GoogleAnalytics gaId="G-MD1FJ1J7XQ" />
       </body>
     </html>
   )
