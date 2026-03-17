@@ -19,6 +19,19 @@ const SORT_OPTIONS = [
 const capitalize = (str: string) =>
   str.replace(/\b\w/g, c => c.toUpperCase())
 
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'TicketFlix',
+  url: 'https://ticketflix-ten.vercel.app',
+  description: 'Book tickets for movies, concerts, sports and theatre events online. Select seats, pay securely with Razorpay, and get instant QR-coded tickets.',
+  potentialAction: {
+    '@type': 'SearchAction',
+    target: 'https://ticketflix-ten.vercel.app/?search={search_term_string}',
+    'query-input': 'required name=search_term_string',
+  },
+}
+
 export default function Home() {
   const { events, loading, error } = useEvents()
   const router = useRouter()
@@ -152,253 +165,261 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-black">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <>
+      {/* JSON-LD Structured Data for SEO */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
 
-        {/* Hero */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="mb-10 text-center"
-        >
-          <h1 className="text-5xl font-bold text-white mb-4">
-            Discover <span className="text-red-600">Events</span>
-          </h1>
-          <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-            Movies, concerts, sports and more. Book instantly.
-          </p>
-        </motion.div>
+      <div className="min-h-screen bg-black">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
 
-        {/* Search Bar */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.2 }}
-          className="mb-6"
-        >
-          <div className="flex gap-3">
-            <div className="relative flex-1">
-              <Search
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"
-                size={20}
-              />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search events, movies, concerts..."
-                className="w-full pl-12 pr-10 py-3 bg-gray-900 border border-gray-800 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-red-600 transition"
-              />
-              {search && (
-                <button
-                  onClick={() => setSearch('')}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition"
-                >
-                  <X size={16} />
-                </button>
-              )}
-            </div>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-4 py-3 rounded-xl border transition font-medium ${showFilters || hasActiveFilters
-                  ? 'bg-red-600 border-red-600 text-white'
-                  : 'bg-gray-900 border-gray-800 text-gray-300 hover:border-gray-600'
-                }`}
-            >
-              <SlidersHorizontal size={18} />
-              Filters
-              {hasActiveFilters && (
-                <span className="w-5 h-5 bg-white text-red-600 rounded-full text-xs flex items-center justify-center font-bold">
-                  !
-                </span>
-              )}
-            </button>
-          </div>
-        </motion.div>
-
-        {/* Filter Panel */}
-        <AnimatePresence>
-          {showFilters && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden mb-6"
-            >
-              <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-
-                  {/* Event Type */}
-                  <div>
-                    <label className="block text-gray-400 text-xs font-medium mb-3 uppercase tracking-wide">
-                      Event Type
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {EVENT_TYPES.map((type) => (
-                        <button
-                          key={type}
-                          onClick={() => setSelectedType(type)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${selectedType === type
-                              ? 'bg-red-600 text-white'
-                              : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
-                            }`}
-                        >
-                          {type === 'MOVIE' ? '🎬 ' :
-                            type === 'CONCERT' ? '🎵 ' :
-                              type === 'SPORTS' ? '⚽ ' :
-                                type === 'OTHER' ? '🎪 ' : '✨ '}
-                          {type}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Language */}
-                  <div>
-                    <label className="block text-gray-400 text-xs font-medium mb-3 uppercase tracking-wide">
-                      Language
-                    </label>
-                    <select
-                      value={selectedLanguage}
-                      onChange={(e) => setSelectedLanguage(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-red-600 transition"
-                    >
-                      {languages.map((lang) => (
-                        <option key={lang} value={lang}>{lang}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Genre */}
-                  <div>
-                    <label className="block text-gray-400 text-xs font-medium mb-3 uppercase tracking-wide">
-                      Genre
-                    </label>
-                    <select
-                      value={selectedGenre}
-                      onChange={(e) => setSelectedGenre(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-red-600 transition"
-                    >
-                      {genres.map((genre) => (
-                        <option key={genre} value={genre}>{genre}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Sort */}
-                  <div>
-                    <label className="block text-gray-400 text-xs font-medium mb-3 uppercase tracking-wide">
-                      Sort By
-                    </label>
-                    <select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-red-600 transition"
-                    >
-                      {SORT_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                </div>
-
-                {/* Clear Filters */}
-                {hasActiveFilters && (
-                  <div className="mt-5 pt-4 border-t border-gray-800 flex justify-end">
-                    <button
-                      onClick={clearFilters}
-                      className="flex items-center gap-2 text-red-500 hover:text-red-400 text-sm transition"
-                    >
-                      <X size={14} />
-                      Clear all filters
-                    </button>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Results Count */}
-        {!loading && !error && hasActiveFilters && (
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-gray-400 text-sm mb-5"
+          {/* Hero */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="mb-10 text-center"
           >
-            Showing{' '}
-            <span className="text-white font-semibold">{filteredEvents.length}</span>
-            {' '}of{' '}
-            <span className="text-white font-semibold">{events.length}</span>
-            {' '}events
-          </motion.p>
-        )}
+            <h1 className="text-5xl font-bold text-white mb-4">
+              Discover <span className="text-red-600">Events</span>
+            </h1>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+              Movies, concerts, sports and more. Book instantly.
+            </p>
+          </motion.div>
 
-        {loading && (
-          <div className="text-center text-gray-400 py-16">Loading events...</div>
-        )}
-
-        {error && (
-          <div className="text-center text-red-500 py-16">{error}</div>
-        )}
-
-        {!loading && !error && (
-          <>
-            {filteredEvents.length === 0 ? (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-center py-24 border border-dashed border-gray-800 rounded-xl"
-              >
-                <p className="text-4xl mb-4">🔍</p>
-                <p className="text-gray-400 text-lg mb-2">
-                  {hasActiveFilters
-                    ? 'No events match your filters'
-                    : 'No events available right now'}
-                </p>
-                <p className="text-gray-500 text-sm mb-6">
-                  {hasActiveFilters
-                    ? 'Try adjusting or clearing your filters'
-                    : 'Please check back later'}
-                </p>
-                {hasActiveFilters && (
+          {/* Search Bar */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.2 }}
+            className="mb-6"
+          >
+            <div className="flex gap-3">
+              <div className="relative flex-1">
+                <Search
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"
+                  size={20}
+                />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search events, movies, concerts..."
+                  className="w-full pl-12 pr-10 py-3 bg-gray-900 border border-gray-800 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-red-600 transition"
+                />
+                {search && (
                   <button
-                    onClick={clearFilters}
-                    className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold"
+                    onClick={() => setSearch('')}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition"
                   >
-                    Clear Filters
+                    <X size={16} />
                   </button>
                 )}
-              </motion.div>
-            ) : (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.4 }}
-                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+              </div>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center gap-2 px-4 py-3 rounded-xl border transition font-medium ${showFilters || hasActiveFilters
+                    ? 'bg-red-600 border-red-600 text-white'
+                    : 'bg-gray-900 border-gray-800 text-gray-300 hover:border-gray-600'
+                  }`}
               >
-                <AnimatePresence mode="popLayout">
-                  {filteredEvents.map((event) => (
-                    <motion.div
-                      key={event.id}
-                      layout
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <EventCard event={event} />
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
+                <SlidersHorizontal size={18} />
+                Filters
+                {hasActiveFilters && (
+                  <span className="w-5 h-5 bg-white text-red-600 rounded-full text-xs flex items-center justify-center font-bold">
+                    !
+                  </span>
+                )}
+              </button>
+            </div>
+          </motion.div>
+
+          {/* Filter Panel */}
+          <AnimatePresence>
+            {showFilters && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden mb-6"
+              >
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+
+                    {/* Event Type */}
+                    <div>
+                      <label className="block text-gray-400 text-xs font-medium mb-3 uppercase tracking-wide">
+                        Event Type
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {EVENT_TYPES.map((type) => (
+                          <button
+                            key={type}
+                            onClick={() => setSelectedType(type)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${selectedType === type
+                                ? 'bg-red-600 text-white'
+                                : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                              }`}
+                          >
+                            {type === 'MOVIE' ? '🎬 ' :
+                              type === 'CONCERT' ? '🎵 ' :
+                                type === 'SPORTS' ? '⚽ ' :
+                                  type === 'OTHER' ? '🎪 ' : '✨ '}
+                            {type}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Language */}
+                    <div>
+                      <label className="block text-gray-400 text-xs font-medium mb-3 uppercase tracking-wide">
+                        Language
+                      </label>
+                      <select
+                        value={selectedLanguage}
+                        onChange={(e) => setSelectedLanguage(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-red-600 transition"
+                      >
+                        {languages.map((lang) => (
+                          <option key={lang} value={lang}>{lang}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Genre */}
+                    <div>
+                      <label className="block text-gray-400 text-xs font-medium mb-3 uppercase tracking-wide">
+                        Genre
+                      </label>
+                      <select
+                        value={selectedGenre}
+                        onChange={(e) => setSelectedGenre(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-red-600 transition"
+                      >
+                        {genres.map((genre) => (
+                          <option key={genre} value={genre}>{genre}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Sort */}
+                    <div>
+                      <label className="block text-gray-400 text-xs font-medium mb-3 uppercase tracking-wide">
+                        Sort By
+                      </label>
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-red-600 transition"
+                      >
+                        {SORT_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                  </div>
+
+                  {/* Clear Filters */}
+                  {hasActiveFilters && (
+                    <div className="mt-5 pt-4 border-t border-gray-800 flex justify-end">
+                      <button
+                        onClick={clearFilters}
+                        className="flex items-center gap-2 text-red-500 hover:text-red-400 text-sm transition"
+                      >
+                        <X size={14} />
+                        Clear all filters
+                      </button>
+                    </div>
+                  )}
+                </div>
               </motion.div>
             )}
-          </>
-        )}
+          </AnimatePresence>
 
+          {/* Results Count */}
+          {!loading && !error && hasActiveFilters && (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-gray-400 text-sm mb-5"
+            >
+              Showing{' '}
+              <span className="text-white font-semibold">{filteredEvents.length}</span>
+              {' '}of{' '}
+              <span className="text-white font-semibold">{events.length}</span>
+              {' '}events
+            </motion.p>
+          )}
+
+          {loading && (
+            <div className="text-center text-gray-400 py-16">Loading events...</div>
+          )}
+
+          {error && (
+            <div className="text-center text-red-500 py-16">{error}</div>
+          )}
+
+          {!loading && !error && (
+            <>
+              {filteredEvents.length === 0 ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-center py-24 border border-dashed border-gray-800 rounded-xl"
+                >
+                  <p className="text-4xl mb-4">🔍</p>
+                  <p className="text-gray-400 text-lg mb-2">
+                    {hasActiveFilters
+                      ? 'No events match your filters'
+                      : 'No events available right now'}
+                  </p>
+                  <p className="text-gray-500 text-sm mb-6">
+                    {hasActiveFilters
+                      ? 'Try adjusting or clearing your filters'
+                      : 'Please check back later'}
+                  </p>
+                  {hasActiveFilters && (
+                    <button
+                      onClick={clearFilters}
+                      className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </motion.div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.4 }}
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+                >
+                  <AnimatePresence mode="popLayout">
+                    {filteredEvents.map((event) => (
+                      <motion.div
+                        key={event.id}
+                        layout
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <EventCard event={event} />
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </motion.div>
+              )}
+            </>
+          )}
+
+        </div>
       </div>
-    </div>
+    </>
   )
 }

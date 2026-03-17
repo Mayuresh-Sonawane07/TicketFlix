@@ -8,11 +8,49 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'TicketFlix - Movie Booking',
-  description: 'Book movie tickets online',
-  generator: 'v0.app',
+  title: 'TicketFlix — Book Movie & Event Tickets Online',
+  description: 'Book tickets for movies, concerts, sports and theatre events online. Select seats, pay securely with Razorpay, and get instant QR-coded tickets. Best ticket booking platform in India.',
+  keywords: 'ticket booking, movie tickets, event tickets, online booking, book tickets, concert tickets, sports tickets, TicketFlix',
+  authors: [{ name: 'TicketFlix' }],
+  creator: 'TicketFlix',
+  metadataBase: new URL('https://ticketflix-ten.vercel.app'),
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    title: 'TicketFlix — Book Movie & Event Tickets Online',
+    description: 'Book tickets for movies, concerts, sports and theatre events online. Select seats, pay securely, get instant QR tickets.',
+    url: 'https://ticketflix-ten.vercel.app',
+    siteName: 'TicketFlix',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'TicketFlix — Online Event Booking',
+      },
+    ],
+    locale: 'en_IN',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'TicketFlix — Book Movie & Event Tickets Online',
+    description: 'Book tickets for movies, concerts, sports and theatre events online.',
+    images: ['/og-image.png'],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+    },
+  },
   icons: {
-    icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
+    icon: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
   },
 }
 
