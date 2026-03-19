@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import type { Event } from '@/lib/api'
+import { Event } from '@/lib/api'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Heart, Star } from 'lucide-react'
 import { useWishlist } from '@/hooks/useWishlist'
