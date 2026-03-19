@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { Event } from '@/lib/api'
+import type { Event } from '@/lib/api'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Heart, Star } from 'lucide-react'
 import { useWishlist } from '@/hooks/useWishlist'
@@ -16,10 +16,46 @@ function getImageUrl(image?: string): string | null {
   return `${API_BASE}/media/${image}`
 }
 
+function parseGenres(genre?: string): string[] {
+  if (!genre) return []
+  return genre
+    .split(/\s*[|,،]\s*/)
+    .map(g => g.trim())
+    .filter(Boolean)
+    .slice(0, 3)
+}
+
+const GENRE_COLORS: Record<string, string> = {
+  action:     'bg-red-600/20 text-red-400 border-red-600/30',
+  drama:      'bg-purple-600/20 text-purple-400 border-purple-600/30',
+  comedy:     'bg-yellow-600/20 text-yellow-400 border-yellow-600/30',
+  thriller:   'bg-orange-600/20 text-orange-400 border-orange-600/30',
+  horror:     'bg-red-900/30 text-red-300 border-red-900/40',
+  romance:    'bg-pink-600/20 text-pink-400 border-pink-600/30',
+  scifi:      'bg-cyan-600/20 text-cyan-400 border-cyan-600/30',
+  'sci-fi':   'bg-cyan-600/20 text-cyan-400 border-cyan-600/30',
+  fantasy:    'bg-indigo-600/20 text-indigo-400 border-indigo-600/30',
+  adventure:  'bg-green-600/20 text-green-400 border-green-600/30',
+  animation:  'bg-blue-600/20 text-blue-400 border-blue-600/30',
+  anime:      'bg-blue-600/20 text-blue-400 border-blue-600/30',
+  crime:      'bg-gray-600/20 text-gray-300 border-gray-600/30',
+  mystery:    'bg-violet-600/20 text-violet-400 border-violet-600/30',
+  historical: 'bg-amber-600/20 text-amber-400 border-amber-600/30',
+  sports:     'bg-lime-600/20 text-lime-400 border-lime-600/30',
+  music:      'bg-teal-600/20 text-teal-400 border-teal-600/30',
+  default:    'bg-gray-700/40 text-gray-300 border-gray-600/30',
+}
+
+function getGenreColor(genre: string): string {
+  const key = genre.toLowerCase()
+  return GENRE_COLORS[key] || GENRE_COLORS.default
+}
+
 export default function EventCard({ event }: { event: Event }) {
   const imageUrl = getImageUrl(event.image)
   const { isWishlisted, toggleWishlist } = useWishlist()
   const wishlisted = isWishlisted(event.id)
+  const genres = parseGenres(event.genre)
 
   return (
     <motion.div whileHover={{ scale: 1.04, y: -6 }} transition={{ duration: 0.25 }} className="group relative">
@@ -69,9 +105,28 @@ export default function EventCard({ event }: { event: Event }) {
               <span>{event.language || 'N/A'}</span>
             </div>
             <p className="text-xs text-gray-500 line-clamp-2 mb-4">{event.description || 'No description available'}</p>
-            <div className="flex items-center justify-between">
-              <span className="text-xs px-2 py-1 bg-gray-800 text-gray-300 rounded-md">{event.genre || 'Unknown'}</span>
-              <span className="text-sm font-semibold text-red-500 group-hover:text-red-400 transition">View Details →</span>
+
+            {/* Genre Badges + View Details */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
+                {genres.length > 0 ? (
+                  genres.map((genre) => (
+                    <span
+                      key={genre}
+                      className={`text-xs px-2 py-0.5 rounded-full border font-medium capitalize ${getGenreColor(genre)}`}
+                    >
+                      {genre}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-xs px-2 py-0.5 rounded-full border font-medium bg-gray-700/40 text-gray-400 border-gray-600/30">
+                    {event.event_type || 'Event'}
+                  </span>
+                )}
+              </div>
+              <span className="text-sm font-semibold text-red-500 group-hover:text-red-400 transition whitespace-nowrap shrink-0">
+                View Details →
+              </span>
             </div>
           </div>
         </div>
