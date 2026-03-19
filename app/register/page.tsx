@@ -117,10 +117,26 @@ export default function RegisterPage() {
     setError('')
     setSuccess('')
     try {
-      await authAPI.verifyOTP({ email: form.email, otp })
-      const { token, user } = await authAPI.login(form.email, form.password)
-      localStorage.setItem('authToken', token)
-      localStorage.setItem('user', JSON.stringify(user))
+      // Verify OTP — now returns tokens directly
+      const verifyRes = await authAPI.verifyOTP({ email: form.email, otp })
+      const { token, refresh, user } = verifyRes.data as any
+
+      // If verifyOTP returns tokens directly, use them
+      if (token && refresh && user) {
+        localStorage.setItem('authToken', token)
+        localStorage.setItem('refreshToken', refresh)
+        localStorage.setItem('user', JSON.stringify(user))
+        window.dispatchEvent(new Event('authChange'))
+        router.push(form.role === 'VENUE_OWNER' ? '/venue-dashboard' : '/')
+        return
+      }
+
+      // Fallback: login separately to get tokens
+      const { token: loginToken, refresh: loginRefresh, user: loginUser } = await authAPI.login(form.email, form.password)
+      localStorage.setItem('authToken', loginToken)
+      localStorage.setItem('refreshToken', loginRefresh)
+      localStorage.setItem('user', JSON.stringify(loginUser))
+      window.dispatchEvent(new Event('authChange'))
       router.push(form.role === 'VENUE_OWNER' ? '/venue-dashboard' : '/')
     } catch (err: any) {
       const data = err.response?.data
@@ -284,7 +300,6 @@ export default function RegisterPage() {
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
-                  {/* Password strength */}
                   {form.password.length > 0 && (
                     <div className="mt-2">
                       <div className="w-full bg-gray-700 rounded-full h-1.5">

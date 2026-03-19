@@ -11,16 +11,51 @@ export const apiClient = axios.create({
   },
 })
 
-// Attach Basic Auth token
+// Attach Bearer token to every request
 apiClient.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
     const token = localStorage.getItem("authToken")
     if (token) {
-      config.headers.Authorization = `Basic ${token}`
+      config.headers.Authorization = `Bearer ${token}`
     }
   }
   return config
 })
+
+// Auto-refresh access token when it expires (401)
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true
+      try {
+        const refreshToken = localStorage.getItem("refreshToken")
+        if (!refreshToken) {
+          localStorage.removeItem("authToken")
+          localStorage.removeItem("refreshToken")
+          localStorage.removeItem("user")
+          if (typeof window !== "undefined") window.location.href = "/login"
+          return Promise.reject(error)
+        }
+        const res = await axios.post(`${API_BASE_URL}/users/token/refresh/`, {
+          refresh: refreshToken,
+        })
+        const newAccessToken = res.data.access
+        localStorage.setItem("refreshToken", data.refresh)
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
+        return apiClient(originalRequest)
+      } catch {
+        localStorage.removeItem("authToken")
+        localStorage.removeItem("refreshToken")
+        localStorage.removeItem("user")
+        if (typeof window !== "undefined") window.location.href = "/login"
+        return Promise.reject(error)
+      }
+    }
+    return Promise.reject(error)
+  }
+)
 
 /* ============================= */
 /* ========= TYPES ============= */
@@ -102,7 +137,6 @@ export interface Screen {
 /* ========= API CALLS ========= */
 /* ============================= */
 
-// ✅ eventAPI now has ALL event-related calls
 export const eventAPI = {
   getAll: () => apiClient.get<Event[]>("/events/"),
   getMyEvents: () => apiClient.get<Event[]>("/events/my_events/"),
@@ -168,15 +202,24 @@ export const authAPI = {
   verifyOTP: (data: {
     email: string
     otp: string
-  }) => apiClient.post<{ user: User }>("/users/verify-otp/", data),
+  }) => apiClient.post<{ token: string; refresh: string; user: User }>("/users/verify-otp/", data),
 
-  login: async (email: string, password: string): Promise<{ token: string; user: User }> => {
-    const response = await apiClient.post<{ token: string; user: User }>(
+  login: async (email: string, password: string): Promise<{ token: string; refresh: string; user: User }> => {
+    const response = await apiClient.post<{ token: string; refresh: string; user: User }>(
       "/users/login/",
       { email, password }
     )
     return response.data
   },
+
+  googleLogin: (token: string) =>
+    apiClient.post<{ token: string; refresh: string; user: User }>('/users/google-login/', { token }),
+
+  refreshToken: (refresh: string) =>
+    apiClient.post<{ access: string }>('/users/token/refresh/', { refresh }),
+
+  logout: (refresh: string) =>
+    apiClient.post('/users/logout/', { refresh }),
 
   forgotPassword: (email: string) =>
     apiClient.post('/users/forgot-password/', { email }),

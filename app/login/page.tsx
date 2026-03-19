@@ -34,10 +34,11 @@ export default function Login() {
     return err?.response?.data?.error || 'Login failed. Please try again.'
   }
 
-  const handleLoginSuccess = (token: string, user: any) => {
+  const handleLoginSuccess = (token: string, refresh: string, user: any) => {
     localStorage.setItem('authToken', token)
+    localStorage.setItem('refreshToken', refresh)
     localStorage.setItem('user', JSON.stringify(user))
-    window.dispatchEvent(new Event('authChange'))  // ← add this line
+    window.dispatchEvent(new Event('authChange'))
     router.push(user.role === 'VENUE_OWNER' ? '/venue-dashboard' : '/')
   }
 
@@ -50,10 +51,10 @@ export default function Login() {
     }
     try {
       setIsLoading(true)
-      const { token, user } = await authAPI.login(email, password)
+      const { token, refresh, user } = await authAPI.login(email, password)
       if (rememberMe) localStorage.setItem('rememberedEmail', email)
       else localStorage.removeItem('rememberedEmail')
-      handleLoginSuccess(token, user)
+      handleLoginSuccess(token, refresh, user)
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -68,7 +69,7 @@ export default function Login() {
       const res = await apiClient.post('/users/google-login/', {
         token: response.credential,
       })
-      handleLoginSuccess(res.data.token, res.data.user)
+      handleLoginSuccess(res.data.token, res.data.refresh, res.data.user)
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Google login failed. Please try again.')
     } finally {
