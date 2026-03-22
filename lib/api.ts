@@ -138,7 +138,9 @@ export interface Screen {
 /* ============================= */
 
 export const eventAPI = {
-  getAll: () => apiClient.get<Event[]>("/events/"),
+  getAll: (city?: string) => apiClient.get<Event[]>("/events/", {
+    params: city ? { city } : {}
+  }),
   getMyEvents: () => apiClient.get<Event[]>("/events/my_events/"),
   create: (data: FormData) => apiClient.post("/events/", data, {
     headers: { "Content-Type": "multipart/form-data" }
