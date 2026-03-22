@@ -1,17 +1,25 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Film, LogOut, LayoutDashboard, CalendarPlus, List, User, MapPin, Sun, Moon, Heart } from 'lucide-react'
+import { Film, LogOut, LayoutDashboard, CalendarPlus, List, User, MapPin, Sun, Moon, Heart, ChevronDown, Loader2, Search, X } from 'lucide-react'
 import { useTheme } from '@/components/ThemeProvider'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useWishlist } from '@/hooks/useWishlist'
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://web-production-cf420.up.railway.app/api'
 
 interface UserData {
   id: number
   email: string
   role: string
+}
+
+// ── City Context (shared with page) ─────────────────────────────
+// We use a custom event to communicate city changes to page.tsx
+function dispatchCityChange(city: string) {
+  window.dispatchEvent(new CustomEvent('cityChange', { detail: city }))
 }
 
 export default function Navigation() {
@@ -21,6 +29,99 @@ export default function Navigation() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [user, setUser] = useState<UserData | null>(null)
 
+  // ── City state ────────────────────────────────────────────────
+  const [selectedCity, setSelectedCity] = useState<string>('All Cities')
+  const [availableCities, setAvailableCities] = useState<string[]>([])
+  const [cityDropdownOpen, setCityDropdownOpen] = useState(false)
+  const [citySearch, setCitySearch] = useState('')
+  const [detectingLocation, setDetectingLocation] = useState(false)
+  const [locationError, setLocationError] = useState('')
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // ── Fetch cities ──────────────────────────────────────────────
+  useEffect(() => {
+    fetch(`${API_BASE}/events/cities/`)
+      .then(res => res.json())
+      .then((cities: string[]) => setAvailableCities(cities))
+      .catch(() => {})
+  }, [])
+
+  // ── Close dropdown on outside click ──────────────────────────
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setCityDropdownOpen(false)
+        setCitySearch('')
+        setLocationError('')
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // ── Auto-detect location ──────────────────────────────────────
+  const detectLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation not supported')
+      return
+    }
+    setDetectingLocation(true)
+    setLocationError('')
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+          )
+          const data = await res.json()
+          const detectedCity =
+            data.address?.city ||
+            data.address?.town ||
+            data.address?.village ||
+            ''
+
+          if (!detectedCity) {
+            setLocationError('Could not determine your city')
+            return
+          }
+
+          const matched = availableCities.find(
+            c => c.toLowerCase() === detectedCity.toLowerCase()
+          )
+
+          if (matched) {
+            selectCity(matched)
+          } else {
+            setLocationError(`No events near "${detectedCity}"`)
+          }
+        } catch {
+          setLocationError('Failed to detect location')
+        } finally {
+          setDetectingLocation(false)
+        }
+      },
+      () => {
+        setLocationError('Location access denied')
+        setDetectingLocation(false)
+      },
+      { timeout: 8000 }
+    )
+  }
+
+  const selectCity = (city: string) => {
+    setSelectedCity(city)
+    dispatchCityChange(city)
+    setCityDropdownOpen(false)
+    setCitySearch('')
+    setLocationError('')
+  }
+
+  const filteredCities = availableCities.filter(c =>
+    c.toLowerCase().includes(citySearch.toLowerCase())
+  )
+
+  // ── Auth state ────────────────────────────────────────────────
   useEffect(() => {
     const updateNav = () => {
       const token = localStorage.getItem('authToken')
@@ -70,9 +171,131 @@ export default function Navigation() {
           <span>TicketFlix</span>
         </Link>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4">
 
-          {/* Not logged in */}
+          {/* ── City Selector (BookMyShow style) ── */}
+          {!isVenueOwner && (
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setCityDropdownOpen(!cityDropdownOpen)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium ${
+                  theme === 'dark'
+                    ? 'text-gray-300 hover:text-white hover:bg-gray-800'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                <MapPin size={15} className="text-red-500" />
+                <span className="max-w-[100px] truncate">{selectedCity}</span>
+                <ChevronDown
+                  size={14}
+                  className={`transition-transform ${cityDropdownOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+
+              {/* Dropdown */}
+              <AnimatePresence>
+                {cityDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className={`absolute top-full left-0 mt-2 w-72 rounded-xl border shadow-2xl z-50 overflow-hidden ${
+                      theme === 'dark'
+                        ? 'bg-gray-900 border-gray-700'
+                        : 'bg-white border-gray-200'
+                    }`}
+                  >
+                    {/* Header */}
+                    <div className={`px-4 py-3 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-100'}`}>
+                      <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Select City
+                      </p>
+
+                      {/* Search cities */}
+                      <div className="relative">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          value={citySearch}
+                          onChange={e => setCitySearch(e.target.value)}
+                          placeholder="Search city..."
+                          className={`w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border focus:outline-none focus:border-red-500 transition ${
+                            theme === 'dark'
+                              ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-500'
+                              : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400'
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Detect Location */}
+                    <div className={`px-4 py-2 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-100'}`}>
+                      <button
+                        onClick={detectLocation}
+                        disabled={detectingLocation}
+                        className="flex items-center gap-2 text-red-500 hover:text-red-400 text-sm font-medium transition w-full py-1"
+                      >
+                        {detectingLocation
+                          ? <Loader2 size={14} className="animate-spin" />
+                          : <MapPin size={14} />
+                        }
+                        {detectingLocation ? 'Detecting location...' : 'Use my current location'}
+                      </button>
+                      {locationError && (
+                        <p className="text-xs text-red-400 mt-1">{locationError}</p>
+                      )}
+                    </div>
+
+                    {/* City List */}
+                    <div className="max-h-56 overflow-y-auto">
+                      {/* All Cities option */}
+                      <button
+                        onClick={() => selectCity('All Cities')}
+                        className={`w-full text-left px-4 py-2.5 text-sm transition flex items-center justify-between ${
+                          selectedCity === 'All Cities'
+                            ? 'text-red-500 bg-red-500/10'
+                            : theme === 'dark'
+                              ? 'text-gray-300 hover:bg-gray-800'
+                              : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        All Cities
+                        {selectedCity === 'All Cities' && (
+                          <span className="w-2 h-2 rounded-full bg-red-500" />
+                        )}
+                      </button>
+
+                      {filteredCities.length === 0 ? (
+                        <p className="text-center text-gray-500 text-sm py-4">No cities found</p>
+                      ) : (
+                        filteredCities.map(city => (
+                          <button
+                            key={city}
+                            onClick={() => selectCity(city)}
+                            className={`w-full text-left px-4 py-2.5 text-sm transition flex items-center justify-between ${
+                              selectedCity === city
+                                ? 'text-red-500 bg-red-500/10'
+                                : theme === 'dark'
+                                  ? 'text-gray-300 hover:bg-gray-800'
+                                  : 'text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            {city}
+                            {selectedCity === city && (
+                              <span className="w-2 h-2 rounded-full bg-red-500" />
+                            )}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
+          {/* Nav Links */}
           {!isLoggedIn && (
             <>
               <Link href="/" className={navLinkClass}>Events</Link>
@@ -82,7 +305,6 @@ export default function Navigation() {
             </>
           )}
 
-          {/* Customer nav */}
           {isLoggedIn && isCustomer && (
             <>
               <Link href="/" className={navLinkClass}>Events</Link>
@@ -94,7 +316,6 @@ export default function Navigation() {
             </>
           )}
 
-          {/* Venue Owner nav */}
           {isLoggedIn && isVenueOwner && (
             <>
               <Link href="/venue-dashboard" className={`flex items-center gap-1.5 ${navLinkClass}`}>
@@ -118,7 +339,7 @@ export default function Navigation() {
             </>
           )}
 
-          {/* Wishlist Button */}
+          {/* Wishlist */}
           {isLoggedIn && isCustomer && (
             <Link href="/wishlist" className="relative">
               <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
@@ -145,7 +366,6 @@ export default function Navigation() {
                 ? 'bg-gray-800 text-yellow-400 hover:bg-gray-700'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
-            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
             <motion.div
               key={theme}
@@ -156,7 +376,6 @@ export default function Navigation() {
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </motion.div>
           </motion.button>
-
         </div>
       </div>
     </nav>

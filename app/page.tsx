@@ -5,9 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEvents } from '@/hooks/useEvents'
 import EventCard from '@/components/EventCard'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, SlidersHorizontal, X, MapPin, Loader2 } from 'lucide-react'
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://web-production-cf420.up.railway.app/api'
+import { Search, SlidersHorizontal, X } from 'lucide-react'
 
 const EVENT_TYPES = ['All', 'MOVIE', 'CONCERT', 'SPORTS', 'OTHER']
 const SORT_OPTIONS = [
@@ -38,11 +36,18 @@ export default function Home() {
   const router = useRouter()
   const [userRole, setUserRole] = useState<string | null>(null)
 
-  // ── City state ──────────────────────────────────────────
+  // ── City state (controlled by navbar via custom event) ───
   const [selectedCity, setSelectedCity] = useState<string>('All')
-  const [availableCities, setAvailableCities] = useState<string[]>([])
-  const [detectingLocation, setDetectingLocation] = useState(false)
-  const [locationError, setLocationError] = useState('')
+
+  // ── Listen for city changes from navbar ──────────────────
+  useEffect(() => {
+    const handleCityChange = (e: CustomEvent) => {
+      const city = e.detail
+      setSelectedCity(city === 'All Cities' ? 'All' : city)
+    }
+    window.addEventListener('cityChange', handleCityChange as EventListener)
+    return () => window.removeEventListener('cityChange', handleCityChange as EventListener)
+  }, [])
 
   // ── Events (pass city to hook) ───────────────────────────
   const { events, loading, error } = useEvents(selectedCity !== 'All' ? selectedCity : undefined)
@@ -54,68 +59,6 @@ export default function Home() {
   const [selectedGenre, setSelectedGenre] = useState('All')
   const [sortBy, setSortBy] = useState('default')
   const [showFilters, setShowFilters] = useState(false)
-
-  // ── Fetch available cities on mount ─────────────────────
-  useEffect(() => {
-    fetch(`${API_BASE}/events/cities/`)
-      .then(res => res.json())
-      .then((cities: string[]) => setAvailableCities(cities))
-      .catch(() => {})
-  }, [])
-
-  // ── Auto-detect user location ────────────────────────────
-  const detectLocation = () => {
-    if (!navigator.geolocation) {
-      setLocationError('Geolocation not supported by your browser')
-      return
-    }
-    setDetectingLocation(true)
-    setLocationError('')
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const { latitude, longitude } = position.coords
-          // Reverse geocode using free API
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
-          )
-          const data = await res.json()
-          const detectedCity =
-            data.address?.city ||
-            data.address?.town ||
-            data.address?.village ||
-            data.address?.county ||
-            ''
-
-          if (!detectedCity) {
-            setLocationError('Could not determine your city')
-            return
-          }
-
-          // Match against available cities (case-insensitive)
-          const matched = availableCities.find(
-            c => c.toLowerCase() === detectedCity.toLowerCase()
-          )
-
-          if (matched) {
-            setSelectedCity(matched)
-          } else {
-            setLocationError(`No events found near "${detectedCity}"`)
-          }
-        } catch {
-          setLocationError('Failed to detect location')
-        } finally {
-          setDetectingLocation(false)
-        }
-      },
-      () => {
-        setLocationError('Location access denied')
-        setDetectingLocation(false)
-      },
-      { timeout: 8000 }
-    )
-  }
 
   // ── Redirect venue owner ─────────────────────────────────
   useEffect(() => {
@@ -196,8 +139,8 @@ export default function Home() {
     setSelectedLanguage('All')
     setSelectedGenre('All')
     setSortBy('default')
-    setSelectedCity('All')
-    setLocationError('')
+    // Reset city in navbar too
+    window.dispatchEvent(new CustomEvent('cityChange', { detail: 'All Cities' }))
   }
 
   if (userRole === 'VENUE_OWNER') {
@@ -231,62 +174,6 @@ export default function Home() {
             <p className="text-gray-400 text-lg max-w-2xl mx-auto">
               Movies, concerts, sports and more. Book instantly.
             </p>
-          </motion.div>
-
-          {/* City Selector */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.1 }}
-            className="mb-5 flex flex-wrap items-center gap-3"
-          >
-            {/* Detect Location Button */}
-            <button
-              onClick={detectLocation}
-              disabled={detectingLocation}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-900 border border-gray-700 rounded-xl text-gray-300 hover:border-red-600 hover:text-white transition text-sm font-medium"
-            >
-              {detectingLocation
-                ? <Loader2 size={15} className="animate-spin" />
-                : <MapPin size={15} className="text-red-500" />
-              }
-              {detectingLocation ? 'Detecting...' : 'Use My Location'}
-            </button>
-
-            {/* Divider */}
-            <span className="text-gray-700 text-sm">or</span>
-
-            {/* City Pills */}
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => { setSelectedCity('All'); setLocationError('') }}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition border ${
-                  selectedCity === 'All'
-                    ? 'bg-red-600 border-red-600 text-white'
-                    : 'bg-gray-900 border-gray-700 text-gray-400 hover:border-gray-500 hover:text-white'
-                }`}
-              >
-                All Cities
-              </button>
-              {availableCities.map(city => (
-                <button
-                  key={city}
-                  onClick={() => { setSelectedCity(city); setLocationError('') }}
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition border ${
-                    selectedCity === city
-                      ? 'bg-red-600 border-red-600 text-white'
-                      : 'bg-gray-900 border-gray-700 text-gray-400 hover:border-gray-500 hover:text-white'
-                  }`}
-                >
-                  📍 {city}
-                </button>
-              ))}
-            </div>
-
-            {/* Location error */}
-            {locationError && (
-              <span className="text-red-400 text-xs">{locationError}</span>
-            )}
           </motion.div>
 
           {/* Search Bar */}
@@ -426,7 +313,7 @@ export default function Home() {
           </AnimatePresence>
 
           {/* Results Count */}
-          {!loading && !error && (hasActiveFilters || selectedCity !== 'All') && (
+          {!loading && !error && hasActiveFilters && (
             <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-gray-400 text-sm mb-5">
               {selectedCity !== 'All' && (
                 <span className="text-red-400 font-medium">📍 {selectedCity} · </span>
