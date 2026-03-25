@@ -30,36 +30,55 @@ const SEAT_STYLES = {
 interface ScreenPricing { silver: number; gold: number; platinum: number }
 interface SeatWithStatus extends Seat { is_booked: boolean }
 
-// Determine seats per row based on total count
-function getSeatsPerRow(total: number): number {
-  if (total <= 20) return 5
-  if (total <= 40) return 8
-  if (total <= 60) return 11
-  if (total <= 90) return 13
-  return 15
-}
+// ─── Layout constants ────────────────────────────────────────────────────────
 
-// Split a flat row into left/center/right sections
-// left=2, right=2, center=rest (or proportional for small rows)
-function splitRow(row: SeatWithStatus[], perRow: number) {
-  const sideCount = perRow <= 6 ? 1 : 2
-  const left = row.slice(0, sideCount)
-  const right = row.slice(perRow - sideCount, perRow)
-  const center = row.slice(sideCount, perRow - sideCount)
-  return { left, center, right }
-}
+// Silver: one centered block, wider rows
+const SILVER_PER_ROW = 13
 
-// Build rows of exactly perRow seats, padding last row with nulls
-function buildRows(seats: SeatWithStatus[], perRow: number): (SeatWithStatus | null)[][] {
+// Gold / Platinum: left=2, center=7, right=2  → 11 seats per row + 2 aisles
+const SIDE_SEATS = 2
+const CENTER_SEATS = 7
+const GOLD_PER_ROW = SIDE_SEATS + CENTER_SEATS + SIDE_SEATS // 11
+
+// ─── Row builders ────────────────────────────────────────────────────────────
+
+/** Chunk a flat array into rows of `perRow`, padding last row with null */
+function buildRows(
+  seats: SeatWithStatus[],
+  perRow: number
+): (SeatWithStatus | null)[][] {
   const rows: (SeatWithStatus | null)[][] = []
   for (let i = 0; i < seats.length; i += perRow) {
-    const row = seats.slice(i, i + perRow)
-    // Pad last row so it matches perRow length
+    const row: (SeatWithStatus | null)[] = seats.slice(i, i + perRow)
     while (row.length < perRow) row.push(null)
     rows.push(row)
   }
   return rows
 }
+
+/**
+ * Split a full row into left / center / right sections.
+ * Works for any row length ≤ perRow (handles short last rows gracefully).
+ */
+function splitRowSections(
+  row: (SeatWithStatus | null)[],
+  sideSeats: number,
+  centerSeats: number
+) {
+  const perRow = sideSeats + centerSeats + sideSeats
+  const filled = row.slice(0, perRow)
+
+  // Pad to full width so fixed column widths are preserved
+  while (filled.length < perRow) filled.push(null)
+
+  const left   = filled.slice(0, sideSeats)
+  const center = filled.slice(sideSeats, sideSeats + centerSeats)
+  const right  = filled.slice(sideSeats + centerSeats)
+
+  return { left, center, right }
+}
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
 
 function SeatButton({
   seat,
@@ -91,25 +110,202 @@ function SeatButton({
     >
       {seat.is_booked
         ? <span className="text-white/15 text-xs">×</span>
-        : seat.seat_number.replace(/[A-Za-z]+/, '')
-      }
+        : seat.seat_number.replace(/[A-Za-z]+/, '')}
     </motion.button>
   )
 }
 
-// Empty placeholder — keeps grid alignment for short last rows
+/** Invisible placeholder that holds column width */
 function EmptySeat() {
   return <div className="w-9 h-9 shrink-0" />
 }
 
-// Thin aisle divider
-function Aisle({ visible }: { visible: boolean }) {
+/** Thin aisle gap */
+function Aisle() {
   return (
     <div className="w-6 shrink-0 flex items-center justify-center">
-      {visible && <div className="w-px h-5 bg-white/[0.06] rounded-full" />}
+      <div className="w-px h-5 bg-white/[0.06] rounded-full" />
     </div>
   )
 }
+
+// ─── Section renderers ───────────────────────────────────────────────────────
+
+/**
+ * SILVER — all seats in one centered block.
+ * The outer wrapper is `justify-center` so it always sits in the middle.
+ */
+function SilverSection({
+  seats,
+  selectedSeats,
+  styles,
+  onToggle,
+}: {
+  seats: SeatWithStatus[]
+  selectedSeats: number[]
+  styles: typeof SEAT_STYLES['Silver']
+  onToggle: (id: number) => void
+}) {
+  const rows = buildRows(seats, SILVER_PER_ROW)
+
+  return (
+    <div className="flex flex-col gap-2 items-center">
+      {/* Center label */}
+      <div className="text-[9px] text-white/10 tracking-widest uppercase mb-1">Center</div>
+
+      {rows.map((row, rowIndex) => {
+        const realSeats = row.filter(Boolean) as SeatWithStatus[]
+        return (
+          <div key={rowIndex} className="flex items-center gap-1.5">
+            {/* Row label */}
+            <span className={`text-[10px] font-mono w-5 mr-1 text-right shrink-0 ${styles.label} opacity-40`}>
+              {String.fromCharCode(65 + rowIndex)}
+            </span>
+            {/* Seats */}
+            {realSeats.map(seat => (
+              <SeatButton
+                key={seat.id}
+                seat={seat}
+                selected={selectedSeats.includes(seat.id)}
+                styles={styles}
+                onToggle={onToggle}
+              />
+            ))}
+            {/* Pad short last row so row label alignment stays consistent */}
+            {Array.from({ length: SILVER_PER_ROW - realSeats.length }).map((_, i) => (
+              <EmptySeat key={`pad-${i}`} />
+            ))}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * GOLD / PLATINUM — left corner | aisle | center | aisle | right corner
+ *
+ * `noGapLastRow`:  when true (Platinum), the very last row renders as a
+ *                  straight continuous block with no aisles.
+ */
+function SplitSection({
+  seats,
+  selectedSeats,
+  styles,
+  onToggle,
+  noGapLastRow = false,
+}: {
+  seats: SeatWithStatus[]
+  selectedSeats: number[]
+  styles: typeof SEAT_STYLES[keyof typeof SEAT_STYLES]
+  onToggle: (id: number) => void
+  noGapLastRow?: boolean
+}) {
+  const rows = buildRows(seats, GOLD_PER_ROW)
+
+  return (
+    <div className="flex flex-col gap-2 items-center">
+      {/* Column headers */}
+      <div className="flex items-center">
+        {/* row-label spacer */}
+        <div className="w-6 mr-1" />
+        {/* left block label */}
+        <div style={{ width: SIDE_SEATS * 36 + (SIDE_SEATS - 1) * 6 }}
+          className="text-center text-[9px] text-white/10 tracking-widest uppercase">
+          Side
+        </div>
+        {/* left aisle spacer */}
+        <div className="w-6" />
+        {/* center label */}
+        <div style={{ width: CENTER_SEATS * 36 + (CENTER_SEATS - 1) * 6 }}
+          className="text-center text-[9px] text-white/10 tracking-widest uppercase">
+          Center
+        </div>
+        {/* right aisle spacer */}
+        <div className="w-6" />
+        {/* right block label */}
+        <div style={{ width: SIDE_SEATS * 36 + (SIDE_SEATS - 1) * 6 }}
+          className="text-center text-[9px] text-white/10 tracking-widest uppercase">
+          Side
+        </div>
+      </div>
+
+      {rows.map((row, rowIndex) => {
+        const isLastRow = rowIndex === rows.length - 1
+        const rowLabel = (
+          <span className={`text-[10px] font-mono w-5 mr-1 text-right shrink-0 ${styles.label} opacity-40`}>
+            {String.fromCharCode(65 + rowIndex)}
+          </span>
+        )
+
+        // ── Platinum last row: no aisles, seats flow straight across ──
+        if (noGapLastRow && isLastRow) {
+          const realSeats = row.filter(Boolean) as SeatWithStatus[]
+          return (
+            <div key={rowIndex} className="flex items-center gap-1.5">
+              {rowLabel}
+              {realSeats.map(seat => (
+                <SeatButton
+                  key={seat.id}
+                  seat={seat}
+                  selected={selectedSeats.includes(seat.id)}
+                  styles={styles}
+                  onToggle={onToggle}
+                />
+              ))}
+              {/* Pad to keep total width equal */}
+              {Array.from({ length: GOLD_PER_ROW - realSeats.length }).map((_, i) => (
+                <EmptySeat key={`pad-${i}`} />
+              ))}
+            </div>
+          )
+        }
+
+        // ── Normal split row: left | aisle | center | aisle | right ──
+        const { left, center, right } = splitRowSections(row, SIDE_SEATS, CENTER_SEATS)
+
+        return (
+          <div key={rowIndex} className="flex items-center">
+            {rowLabel}
+
+            {/* Left corner */}
+            <div className="flex gap-1.5">
+              {left.map((seat, i) =>
+                seat
+                  ? <SeatButton key={seat.id} seat={seat} selected={selectedSeats.includes(seat.id)} styles={styles} onToggle={onToggle} />
+                  : <EmptySeat key={`l-${i}`} />
+              )}
+            </div>
+
+            <Aisle />
+
+            {/* Center */}
+            <div className="flex gap-1.5">
+              {center.map((seat, i) =>
+                seat
+                  ? <SeatButton key={seat.id} seat={seat} selected={selectedSeats.includes(seat.id)} styles={styles} onToggle={onToggle} />
+                  : <EmptySeat key={`c-${i}`} />
+              )}
+            </div>
+
+            <Aisle />
+
+            {/* Right corner */}
+            <div className="flex gap-1.5">
+              {right.map((seat, i) =>
+                seat
+                  ? <SeatButton key={seat.id} seat={seat} selected={selectedSeats.includes(seat.id)} styles={styles} onToggle={onToggle} />
+                  : <EmptySeat key={`r-${i}`} />
+              )}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function SeatSelectionPage() {
   const { showId } = useParams()
@@ -202,7 +398,11 @@ export default function SeatSelectionPage() {
     const time = show?.show_time
       ? new Date(show.show_time).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
       : ''
-    router.push(`/checkout?${new URLSearchParams({ showId: showId as string, seats: selectedSeats.join(','), title, time, venue }).toString()}`)
+    router.push(`/checkout?${new URLSearchParams({
+      showId: showId as string,
+      seats: selectedSeats.join(','),
+      title, time, venue,
+    }).toString()}`)
   }
 
   const groupedSeats = seats.reduce((acc, seat) => {
@@ -254,10 +454,14 @@ export default function SeatSelectionPage() {
 
         {/* Screen */}
         <div className="mb-10 text-center">
-          <div className="relative mx-auto w-2/3 h-1.5 rounded-full overflow-hidden mb-3"
-            style={{ background: 'linear-gradient(90deg, transparent, rgba(220,38,38,0.6), transparent)' }}>
-            <div className="absolute inset-0 animate-pulse"
-              style={{ background: 'linear-gradient(90deg, transparent, rgba(220,38,38,0.3), transparent)' }} />
+          <div
+            className="relative mx-auto w-2/3 h-1.5 rounded-full overflow-hidden mb-3"
+            style={{ background: 'linear-gradient(90deg, transparent, rgba(220,38,38,0.6), transparent)' }}
+          >
+            <div
+              className="absolute inset-0 animate-pulse"
+              style={{ background: 'linear-gradient(90deg, transparent, rgba(220,38,38,0.3), transparent)' }}
+            />
           </div>
           <p className="text-gray-600 text-[10px] tracking-[0.2em] uppercase font-medium">Screen this side</p>
         </div>
@@ -269,16 +473,13 @@ export default function SeatSelectionPage() {
           </div>
         )}
 
-        {/* Tier sections */}
+        {/* ── Tier sections ─────────────────────────────────────────────── */}
         {(['Silver', 'Gold', 'Platinum'] as const).map(category => {
           const categorySeats = groupedSeats[category]
           if (!categorySeats || categorySeats.length === 0) return null
 
           const styles = SEAT_STYLES[category]
           const availableCount = categorySeats.filter(s => !s.is_booked).length
-          const perRow = getSeatsPerRow(categorySeats.length)
-          const rows = buildRows(categorySeats, perRow)
-          const sideCount = perRow <= 6 ? 1 : 2
 
           return (
             <div key={category} className="mb-12">
@@ -292,85 +493,37 @@ export default function SeatSelectionPage() {
                 <span className="text-gray-600 text-xs ml-auto">{availableCount} available</span>
               </div>
 
-              {/* Aisle labels */}
-              <div className="flex items-center mb-1 pl-7">
-                <div style={{ width: sideCount * 36 + (sideCount - 1) * 6 }} />
-                <div className="w-6" />
-                <div className="flex-1 text-center">
-                  <span className="text-[9px] text-white/10 tracking-widest uppercase">Center</span>
-                </div>
-                <div className="w-6" />
-                <div style={{ width: sideCount * 36 + (sideCount - 1) * 6 }} />
-              </div>
+              {/* ── Silver: one centered block ── */}
+              {category === 'Silver' && (
+                <SilverSection
+                  seats={categorySeats}
+                  selectedSeats={selectedSeats}
+                  styles={styles}
+                  onToggle={toggleSeat}
+                />
+              )}
 
-              {/* Seat rows */}
-              <div className="flex flex-col gap-2">
-                {rows.map((row, rowIndex) => {
-                  const isLastRow = rowIndex === rows.length - 1
-                  const { left, center, right } = splitRow(
-                    row.filter(Boolean) as SeatWithStatus[],
-                    Math.min(row.filter(Boolean).length, perRow)
-                  )
+              {/* ── Gold: left | gap | center | gap | right, all rows ── */}
+              {category === 'Gold' && (
+                <SplitSection
+                  seats={categorySeats}
+                  selectedSeats={selectedSeats}
+                  styles={styles}
+                  onToggle={toggleSeat}
+                  noGapLastRow={false}
+                />
+              )}
 
-                  // For last row: no aisles, all seats run straight across (padded with empty)
-                  if (isLastRow) {
-                    const realSeats = row.filter(Boolean) as SeatWithStatus[]
-                    return (
-                      <div key={rowIndex} className="flex items-center gap-1.5">
-                        <span className={`text-[10px] font-mono w-5 mr-1 text-right shrink-0 ${styles.label} opacity-40`}>
-                          {String.fromCharCode(65 + rowIndex)}
-                        </span>
-                        {realSeats.map(seat => (
-                          <SeatButton key={seat.id} seat={seat} selected={selectedSeats.includes(seat.id)} styles={styles} onToggle={toggleSeat} />
-                        ))}
-                        {/* Pad remaining slots so last row aligns with others */}
-                        {Array.from({ length: perRow - realSeats.length }).map((_, i) => (
-                          <EmptySeat key={`pad-${i}`} />
-                        ))}
-                      </div>
-                    )
-                  }
-
-                  return (
-                    <div key={rowIndex} className="flex items-center">
-                      {/* Row label */}
-                      <span className={`text-[10px] font-mono w-5 mr-1 text-right shrink-0 ${styles.label} opacity-40`}>
-                        {String.fromCharCode(65 + rowIndex)}
-                      </span>
-
-                      {/* Left block — fixed width */}
-                      <div className="flex gap-1.5">
-                        {left.map(seat => seat
-                          ? <SeatButton key={seat.id} seat={seat} selected={selectedSeats.includes(seat.id)} styles={styles} onToggle={toggleSeat} />
-                          : <EmptySeat key={Math.random()} />
-                        )}
-                      </div>
-
-                      {/* Left aisle */}
-                      <Aisle visible={true} />
-
-                      {/* Center block — fixed width */}
-                      <div className="flex gap-1.5">
-                        {center.map(seat => seat
-                          ? <SeatButton key={seat.id} seat={seat} selected={selectedSeats.includes(seat.id)} styles={styles} onToggle={toggleSeat} />
-                          : <EmptySeat key={Math.random()} />
-                        )}
-                      </div>
-
-                      {/* Right aisle */}
-                      <Aisle visible={true} />
-
-                      {/* Right block — fixed width */}
-                      <div className="flex gap-1.5">
-                        {right.map(seat => seat
-                          ? <SeatButton key={seat.id} seat={seat} selected={selectedSeats.includes(seat.id)} styles={styles} onToggle={toggleSeat} />
-                          : <EmptySeat key={Math.random()} />
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+              {/* ── Platinum: same as Gold but last row is no-gap ── */}
+              {category === 'Platinum' && (
+                <SplitSection
+                  seats={categorySeats}
+                  selectedSeats={selectedSeats}
+                  styles={styles}
+                  onToggle={toggleSeat}
+                  noGapLastRow={true}
+                />
+              )}
             </div>
           )
         })}
@@ -385,8 +538,8 @@ export default function SeatSelectionPage() {
         <div className="flex items-center gap-5 mt-6 flex-wrap">
           {[
             { label: 'Available', cls: 'border-2 border-gray-600' },
-            { label: 'Selected', cls: 'bg-white/70' },
-            { label: 'Booked', cls: 'bg-white/[0.04] border border-white/10' },
+            { label: 'Selected',  cls: 'bg-white/70' },
+            { label: 'Booked',    cls: 'bg-white/[0.04] border border-white/10' },
           ].map(({ label, cls }) => (
             <div key={label} className="flex items-center gap-2">
               <div className={`w-4 h-4 rounded-md ${cls}`} />
@@ -397,7 +550,7 @@ export default function SeatSelectionPage() {
 
       </div>
 
-      {/* Booking bar */}
+      {/* ── Booking bar ───────────────────────────────────────────────── */}
       <AnimatePresence>
         {selectedSeats.length > 0 && (
           <motion.div
@@ -455,7 +608,7 @@ export default function SeatSelectionPage() {
         )}
       </AnimatePresence>
 
-      {/* Timer expired modal */}
+      {/* ── Timer expired modal ───────────────────────────────────────── */}
       <AnimatePresence>
         {timerExpired && (
           <motion.div
