@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { apiClient, seatAPI, Seat, Show } from '@/lib/api'
 import { ArrowLeft, Ticket, Timer } from 'lucide-react'
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const SEAT_STYLES = {
   Silver: {
@@ -14,53 +14,69 @@ const SEAT_STYLES = {
     selected: 'bg-slate-500 text-white border-slate-500 shadow-lg shadow-slate-500/30',
     label: 'text-slate-400',
     badge: 'bg-slate-500/10 border-slate-500/30 text-slate-400',
-    sectionLabel: 'text-slate-500/40',
+    dim: 'text-slate-500/40',
   },
   Gold: {
     available: 'border-yellow-500/70 text-yellow-400 hover:bg-yellow-500/15 hover:border-yellow-400',
     selected: 'bg-yellow-500 text-black border-yellow-500 shadow-lg shadow-yellow-500/30',
     label: 'text-yellow-500',
     badge: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500',
-    sectionLabel: 'text-yellow-500/30',
+    dim: 'text-yellow-500/30',
   },
   Platinum: {
     available: 'border-violet-500/70 text-violet-400 hover:bg-violet-500/15 hover:border-violet-400',
     selected: 'bg-violet-500 text-white border-violet-500 shadow-lg shadow-violet-500/30',
     label: 'text-violet-400',
     badge: 'bg-violet-500/10 border-violet-500/30 text-violet-400',
-    sectionLabel: 'text-violet-500/30',
+    dim: 'text-violet-500/30',
   },
 }
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ScreenPricing { silver: number; gold: number; platinum: number }
 interface SeatWithStatus extends Seat { is_booked: boolean }
 
-// ─── Layout helpers ───────────────────────────────────────────────────────────
+// ─── Layout engine ────────────────────────────────────────────────────────────
+//
+// The key insight from the reference image:
+//   • Silver  → ONLY a center block.  total = centerCols × rows
+//   • Gold    → LEFT corner block  +  center block  +  RIGHT corner block
+//               (corners are INDEPENDENT columns, additive to center)
+//               total = (cornerCols + centerCols + cornerCols) × rows
+//   • Platinum→ Same as Gold, but last row is one straight continuous line.
+//
+// We derive centerCols from Silver's total, then keep the same centerCols
+// for Gold/Platinum so all three sections visually align on the center grid.
+// Corner columns sit outside that shared center width.
+
+const SEAT_W = 36   // w-9 = 36 px
+const GAP    = 6    // gap-1.5 = 6 px
+const AISLE  = 20   // w-5 = 20 px
+
+function px(cols: number) {
+  return cols * SEAT_W + Math.max(0, cols - 1) * GAP
+}
 
 /**
- * Derive per-row layout counts dynamically from total seat count.
- *
- * Target column count:
- *   ≤ 30  → 8    ≤ 60 → 11    ≤ 100 → 13    > 100 → 15
- *
- * Silver  → all cols go to center (no corners)
- * Gold/Pt → cornerCols ≈ 18% of totalCols (min 2, max 4), center = rest
+ * Given a total seat count, figure out how many columns per row to use
+ * so we get a reasonable number of rows (target ~5–7 rows).
  */
-function deriveLayout(total: number, category: 'Silver' | 'Gold' | 'Platinum') {
-  const totalCols =
-    total <= 30  ? 8  :
-    total <= 60  ? 11 :
-    total <= 100 ? 13 : 15
+function colsForTotal(total: number): number {
+  if (total <= 24)  return 4
+  if (total <= 40)  return 6
+  if (total <= 65)  return 9
+  if (total <= 91)  return 13
+  if (total <= 120) return 15
+  return Math.ceil(total / 7)   // ~7 rows for very large screens
+}
 
-  if (category === 'Silver') {
-    return { perRow: totalCols, cornerCols: 0, centerCols: totalCols }
-  }
-
-  const cornerCols = Math.min(4, Math.max(2, Math.round(totalCols * 0.18)))
-  const centerCols = totalCols - cornerCols * 2
-  return { perRow: totalCols, cornerCols, centerCols }
+/**
+ * Corner column count for Gold / Platinum.
+ * Always 2–3 cols, scales slightly with center width.
+ */
+function cornerColsFor(centerCols: number): number {
+  return centerCols >= 12 ? 3 : 2
 }
 
 /** Chunk seats into rows of `perRow`, padding last row with null */
@@ -74,18 +90,9 @@ function buildRows(seats: SeatWithStatus[], perRow: number): (SeatWithStatus | n
   return rows
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Atoms ────────────────────────────────────────────────────────────────────
 
-const SEAT_W = 36 // w-9 = 36px
-const GAP    = 6  // gap-1.5 = 6px
-
-function blockPx(cols: number) {
-  return cols * SEAT_W + Math.max(0, cols - 1) * GAP
-}
-
-// ─── Atoms ───────────────────────────────────────────────────────────────────
-
-function SeatButton({
+function SeatBtn({
   seat, selected, styles, onToggle,
 }: {
   seat: SeatWithStatus
@@ -114,9 +121,7 @@ function SeatButton({
   )
 }
 
-function EmptySeat() {
-  return <div className="w-9 h-9 shrink-0" />
-}
+function EmptySeat() { return <div className="w-9 h-9 shrink-0" /> }
 
 function Aisle() {
   return (
@@ -126,36 +131,8 @@ function Aisle() {
   )
 }
 
-// ─── Column headers (Gold / Platinum only) ────────────────────────────────────
-
-function ColumnHeaders({
-  cornerCols, centerCols, styles,
-}: {
-  cornerCols: number
-  centerCols: number
-  styles: (typeof SEAT_STYLES)[keyof typeof SEAT_STYLES]
-}) {
-  const lw = blockPx(cornerCols)
-  const cw = blockPx(centerCols)
-  return (
-    <div className="flex items-center mb-1">
-      <div className="w-6 mr-1 shrink-0" />
-      <div style={{ width: lw }} className={`text-center text-[8px] tracking-widest uppercase ${styles.sectionLabel}`}>
-        Left Corner
-      </div>
-      <div className="w-5 shrink-0" />
-      <div style={{ width: cw }} className={`text-center text-[8px] tracking-widest uppercase ${styles.sectionLabel}`}>
-        Center
-      </div>
-      <div className="w-5 shrink-0" />
-      <div style={{ width: lw }} className={`text-center text-[8px] tracking-widest uppercase ${styles.sectionLabel}`}>
-        Right Corner
-      </div>
-    </div>
-  )
-}
-
-// ─── Silver: one centered block ───────────────────────────────────────────────
+// ─── Silver ───────────────────────────────────────────────────────────────────
+// Pure center block, no corners, horizontally centered on the page.
 
 function SilverSection({
   seats, selectedSeats, styles, onToggle,
@@ -165,12 +142,17 @@ function SilverSection({
   styles: (typeof SEAT_STYLES)['Silver']
   onToggle: (id: number) => void
 }) {
-  const { perRow } = deriveLayout(seats.length, 'Silver')
-  const rows = buildRows(seats, perRow)
+  const centerCols = colsForTotal(seats.length)
+  const rows = buildRows(seats, centerCols)
 
   return (
-    <div className="flex flex-col gap-2 items-center">
-      <div className={`text-[8px] tracking-widest uppercase mb-1 ${styles.sectionLabel}`}>Center</div>
+    <div className="flex flex-col items-center gap-2">
+      {/* column label */}
+      <div style={{ width: px(centerCols) }}
+        className={`text-center text-[8px] tracking-widest uppercase mb-1 ${styles.dim}`}>
+        Center
+      </div>
+
       {rows.map((row, ri) => {
         const real = row.filter(Boolean) as SeatWithStatus[]
         return (
@@ -179,9 +161,9 @@ function SilverSection({
               {String.fromCharCode(65 + ri)}
             </span>
             {real.map(s => (
-              <SeatButton key={s.id} seat={s} selected={selectedSeats.includes(s.id)} styles={styles} onToggle={onToggle} />
+              <SeatBtn key={s.id} seat={s} selected={selectedSeats.includes(s.id)} styles={styles} onToggle={onToggle} />
             ))}
-            {Array.from({ length: perRow - real.length }).map((_, i) => <EmptySeat key={i} />)}
+            {Array.from({ length: centerCols - real.length }).map((_, i) => <EmptySeat key={i} />)}
           </div>
         )
       })}
@@ -189,33 +171,61 @@ function SilverSection({
   )
 }
 
-// ─── Split section: Gold / Platinum ──────────────────────────────────────────
-// Layout: left corner | aisle | center | aisle | right corner
-// noGapLastRow=true (Platinum): last row is one straight continuous block
+// ─── Gold / Platinum ──────────────────────────────────────────────────────────
+//
+// Structure per row (normal):
+//   [left corner block]  AISLE  [center block]  AISLE  [right corner block]
+//
+// Corner blocks sit OUTSIDE the center grid — they are independent columns.
+// The center block has the same width as Silver's center, so all three
+// sections visually align.
+//
+// Platinum `noGapLastRow`: last row renders as one straight continuous line
+// spanning the full width (no aisles), mimicking a front-row straight bench.
 
 function SplitSection({
-  seats, selectedSeats, styles, onToggle, category, noGapLastRow = false,
+  seats, selectedSeats, styles, onToggle,
+  centerCols,       // passed in so it matches Silver's center width
+  noGapLastRow = false,
 }: {
   seats: SeatWithStatus[]
   selectedSeats: number[]
   styles: (typeof SEAT_STYLES)[keyof typeof SEAT_STYLES]
   onToggle: (id: number) => void
-  category: 'Gold' | 'Platinum'
+  centerCols: number
   noGapLastRow?: boolean
 }) {
-  const { perRow, cornerCols, centerCols } = deriveLayout(seats.length, category)
+  const cc = cornerColsFor(centerCols)
+  const perRow = cc + centerCols + cc
   const rows = buildRows(seats, perRow)
 
-  const renderBlock = (block: (SeatWithStatus | null)[], prefix: string) =>
+  const renderSeats = (block: (SeatWithStatus | null)[], prefix: string) =>
     block.map((seat, i) =>
       seat
-        ? <SeatButton key={seat.id} seat={seat} selected={selectedSeats.includes(seat.id)} styles={styles} onToggle={onToggle} />
+        ? <SeatBtn key={seat.id} seat={seat} selected={selectedSeats.includes(seat.id)} styles={styles} onToggle={onToggle} />
         : <EmptySeat key={`${prefix}-${i}`} />
     )
 
   return (
-    <div className="flex flex-col gap-2 items-center">
-      <ColumnHeaders cornerCols={cornerCols} centerCols={centerCols} styles={styles} />
+    <div className="flex flex-col items-center gap-2">
+      {/* column headers */}
+      <div className="flex items-center mb-1">
+        <div className="w-6 mr-1 shrink-0" />
+        <div style={{ width: px(cc) }}
+          className={`text-center text-[8px] tracking-widest uppercase ${styles.dim}`}>
+          Left Corner
+        </div>
+        <div style={{ width: AISLE }} />
+        <div style={{ width: px(centerCols) }}
+          className={`text-center text-[8px] tracking-widest uppercase ${styles.dim}`}>
+          Center
+        </div>
+        <div style={{ width: AISLE }} />
+        <div style={{ width: px(cc) }}
+          className={`text-center text-[8px] tracking-widest uppercase ${styles.dim}`}>
+          Right Corner
+        </div>
+      </div>
 
       {rows.map((row, ri) => {
         const isLast = ri === rows.length - 1
@@ -225,33 +235,33 @@ function SplitSection({
           </span>
         )
 
-        // Platinum last row: straight line, no aisles
+        // ── Platinum last row: straight continuous line ──────────────
         if (noGapLastRow && isLast) {
           const real = row.filter(Boolean) as SeatWithStatus[]
           return (
             <div key={ri} className="flex items-center gap-1.5">
               {rowLabel}
               {real.map(s => (
-                <SeatButton key={s.id} seat={s} selected={selectedSeats.includes(s.id)} styles={styles} onToggle={onToggle} />
+                <SeatBtn key={s.id} seat={s} selected={selectedSeats.includes(s.id)} styles={styles} onToggle={onToggle} />
               ))}
               {Array.from({ length: perRow - real.length }).map((_, i) => <EmptySeat key={i} />)}
             </div>
           )
         }
 
-        // Normal split row
-        const left   = row.slice(0, cornerCols)
-        const center = row.slice(cornerCols, cornerCols + centerCols)
-        const right  = row.slice(cornerCols + centerCols, perRow)
+        // ── Normal row: left corner | aisle | center | aisle | right corner ──
+        const left   = row.slice(0, cc)
+        const center = row.slice(cc, cc + centerCols)
+        const right  = row.slice(cc + centerCols, perRow)
 
         return (
           <div key={ri} className="flex items-center">
             {rowLabel}
-            <div className="flex gap-1.5">{renderBlock(left, 'l')}</div>
+            <div className="flex gap-1.5">{renderSeats(left,   'l')}</div>
             <Aisle />
-            <div className="flex gap-1.5">{renderBlock(center, 'c')}</div>
+            <div className="flex gap-1.5">{renderSeats(center, 'c')}</div>
             <Aisle />
-            <div className="flex gap-1.5">{renderBlock(right, 'r')}</div>
+            <div className="flex gap-1.5">{renderSeats(right,  'r')}</div>
           </div>
         )
       })}
@@ -264,19 +274,19 @@ function SplitSection({
 export default function SeatSelectionPage() {
   const { showId } = useParams()
   const router = useRouter()
-  const [show, setShow] = useState<Show | null>(null)
-  const [seats, setSeats] = useState<SeatWithStatus[]>([])
+  const [show, setShow]               = useState<Show | null>(null)
+  const [seats, setSeats]             = useState<SeatWithStatus[]>([])
   const [selectedSeats, setSelectedSeats] = useState<number[]>([])
-  const [pricing, setPricing] = useState<ScreenPricing>({ silver: 0, gold: 0, platinum: 0 })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [timeLeft, setTimeLeft] = useState<number | null>(null)
+  const [pricing, setPricing]         = useState<ScreenPricing>({ silver: 0, gold: 0, platinum: 0 })
+  const [loading, setLoading]         = useState(true)
+  const [error, setError]             = useState('')
+  const [timeLeft, setTimeLeft]       = useState<number | null>(null)
   const [timerExpired, setTimerExpired] = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem('authToken')
     if (!token) { router.push('/login'); return }
-    const fetchData = async () => {
+    ;(async () => {
       try {
         const [showRes, seatsRes] = await Promise.all([
           apiClient.get<any>(`/theaters/shows/${showId}/`),
@@ -290,8 +300,7 @@ export default function SeatSelectionPage() {
       } finally {
         setLoading(false)
       }
-    }
-    fetchData()
+    })()
   }, [showId])
 
   useEffect(() => {
@@ -367,6 +376,10 @@ export default function SeatSelectionPage() {
     </div>
   )
 
+  // Derive shared centerCols from Silver's seat count so all sections align
+  const silverSeats = groupedSeats['Silver'] ?? []
+  const sharedCenterCols = colsForTotal(Math.max(silverSeats.length, 1))
+
   const selectedBreakdown = getSelectedByCategory()
   const totalAmount = getTotalAmount()
 
@@ -403,10 +416,8 @@ export default function SeatSelectionPage() {
             className="relative mx-auto w-2/3 h-1.5 rounded-full overflow-hidden mb-3"
             style={{ background: 'linear-gradient(90deg, transparent, rgba(220,38,38,0.6), transparent)' }}
           >
-            <div
-              className="absolute inset-0 animate-pulse"
-              style={{ background: 'linear-gradient(90deg, transparent, rgba(220,38,38,0.3), transparent)' }}
-            />
+            <div className="absolute inset-0 animate-pulse"
+              style={{ background: 'linear-gradient(90deg, transparent, rgba(220,38,38,0.3), transparent)' }} />
           </div>
           <p className="text-gray-600 text-[10px] tracking-[0.2em] uppercase font-medium">Screen this side</p>
         </div>
@@ -436,13 +447,34 @@ export default function SeatSelectionPage() {
               </div>
 
               {category === 'Silver' && (
-                <SilverSection seats={categorySeats} selectedSeats={selectedSeats} styles={styles} onToggle={toggleSeat} />
+                <SilverSection
+                  seats={categorySeats}
+                  selectedSeats={selectedSeats}
+                  styles={styles}
+                  onToggle={toggleSeat}
+                />
               )}
+
               {category === 'Gold' && (
-                <SplitSection seats={categorySeats} selectedSeats={selectedSeats} styles={styles} onToggle={toggleSeat} category="Gold" noGapLastRow={false} />
+                <SplitSection
+                  seats={categorySeats}
+                  selectedSeats={selectedSeats}
+                  styles={styles}
+                  onToggle={toggleSeat}
+                  centerCols={sharedCenterCols}
+                  noGapLastRow={false}
+                />
               )}
+
               {category === 'Platinum' && (
-                <SplitSection seats={categorySeats} selectedSeats={selectedSeats} styles={styles} onToggle={toggleSeat} category="Platinum" noGapLastRow={true} />
+                <SplitSection
+                  seats={categorySeats}
+                  selectedSeats={selectedSeats}
+                  styles={styles}
+                  onToggle={toggleSeat}
+                  centerCols={sharedCenterCols}
+                  noGapLastRow={true}
+                />
               )}
             </div>
           )
@@ -528,15 +560,11 @@ export default function SeatSelectionPage() {
       <AnimatePresence>
         {timerExpired && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center px-4"
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
               className="bg-[#111] border border-white/10 rounded-2xl p-8 text-center max-w-sm w-full"
             >
               <div className="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
