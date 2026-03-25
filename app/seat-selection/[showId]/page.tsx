@@ -30,13 +30,57 @@ const SEAT_STYLES = {
 interface ScreenPricing { silver: number; gold: number; platinum: number }
 interface SeatWithStatus extends Seat { is_booked: boolean }
 
-// Split seats into rows of N
-function chunkSeats(seats: SeatWithStatus[], perRow: number) {
-  const rows: SeatWithStatus[][] = []
-  for (let i = 0; i < seats.length; i += perRow) {
-    rows.push(seats.slice(i, i + perRow))
+function splitIntoSections(seats: SeatWithStatus[], totalPerRow: number) {
+  const leftCount = Math.floor(totalPerRow * 0.2)
+  const rightCount = Math.floor(totalPerRow * 0.2)
+  const centerCount = totalPerRow - leftCount - rightCount
+  const rows: { left: SeatWithStatus[]; center: SeatWithStatus[]; right: SeatWithStatus[] }[] = []
+  let i = 0
+  while (i < seats.length) {
+    const left = seats.slice(i, i + leftCount)
+    const center = seats.slice(i + leftCount, i + leftCount + centerCount)
+    const right = seats.slice(i + leftCount + centerCount, i + totalPerRow)
+    if (left.length || center.length || right.length) rows.push({ left, center, right })
+    i += totalPerRow
   }
   return rows
+}
+
+function SeatButton({
+  seat,
+  selected,
+  styles,
+  onToggle,
+}: {
+  seat: SeatWithStatus
+  selected: boolean
+  styles: typeof SEAT_STYLES[keyof typeof SEAT_STYLES]
+  onToggle: (id: number) => void
+}) {
+  return (
+    <motion.button
+      key={seat.id}
+      whileHover={{ scale: seat.is_booked ? 1 : 1.08 }}
+      whileTap={{ scale: seat.is_booked ? 1 : 0.92 }}
+      onClick={() => onToggle(seat.id)}
+      disabled={seat.is_booked}
+      title={seat.is_booked ? 'Already booked' : seat.seat_number}
+      className={`
+        w-9 h-9 rounded-lg border-2 text-[10px] font-bold transition-all duration-150 shrink-0
+        ${seat.is_booked
+          ? 'bg-white/[0.03] border-white/[0.08] text-white/15 cursor-not-allowed'
+          : selected
+          ? styles.selected
+          : styles.available
+        }
+      `}
+    >
+      {seat.is_booked
+        ? <span className="text-white/20 text-sm leading-none">×</span>
+        : seat.seat_number.replace(/[A-Za-z]+/, '')
+      }
+    </motion.button>
+  )
 }
 
 export default function SeatSelectionPage() {
@@ -94,6 +138,7 @@ export default function SeatSelectionPage() {
   const toggleSeat = (seatId: number) => {
     const seat = seats.find(s => s.id === seatId)
     if (!seat || seat.is_booked) return
+    setError('')
     setSelectedSeats(prev =>
       prev.includes(seatId) ? prev.filter(id => id !== seatId) : [...prev, seatId]
     )
@@ -155,7 +200,6 @@ export default function SeatSelectionPage() {
 
   const selectedBreakdown = getSelectedByCategory()
   const totalAmount = getTotalAmount()
-  const SEATS_PER_ROW = 11
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] pb-40">
@@ -178,13 +222,15 @@ export default function SeatSelectionPage() {
                 {(show as any).theater_name}
                 {(show as any).screen_number && ` · Screen ${(show as any).screen_number}`}
                 {' · '}
-                {new Date(show.show_time).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                {new Date(show.show_time).toLocaleString('en-IN', {
+                  dateStyle: 'medium', timeStyle: 'short'
+                })}
               </p>
             )}
           </div>
         </div>
 
-        {/* Screen */}
+        {/* Screen indicator */}
         <div className="mb-10 text-center">
           <div className="relative mx-auto w-2/3 h-1.5 rounded-full overflow-hidden bg-gradient-to-r from-transparent via-red-600/60 to-transparent mb-3">
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-red-400/40 to-transparent animate-pulse" />
@@ -203,14 +249,20 @@ export default function SeatSelectionPage() {
         {['Silver', 'Gold', 'Platinum'].map(category => {
           const categorySeats = groupedSeats[category]
           if (!categorySeats || categorySeats.length === 0) return null
+
           const styles = SEAT_STYLES[category as keyof typeof SEAT_STYLES]
           const availableCount = categorySeats.filter(s => !s.is_booked).length
-          const rows = chunkSeats(categorySeats, SEATS_PER_ROW)
+
+          // Dynamic seats per row based on tier size
+          const SEATS_PER_ROW = categorySeats.length > 60 ? 13 : categorySeats.length > 30 ? 11 : 9
+          const sections = splitIntoSections(categorySeats, SEATS_PER_ROW)
+          const lastRowIndex = sections.length - 1
 
           return (
-            <div key={category} className="mb-10">
+            <div key={category} className="mb-12">
+
               {/* Tier header */}
-              <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-3 mb-5">
                 <div className={`px-3 py-1 rounded-md border text-xs font-semibold tracking-wide ${styles.badge}`}>
                   {category}
                 </div>
@@ -220,44 +272,81 @@ export default function SeatSelectionPage() {
 
               {/* Seat rows */}
               <div className="flex flex-col gap-2">
-                {rows.map((row, rowIndex) => (
-                  <div key={rowIndex} className="flex items-center gap-1.5 flex-wrap">
-                    {/* Row letter label */}
-                    <span className={`text-[10px] font-mono w-5 text-right shrink-0 ${styles.label} opacity-50`}>
-                      {String.fromCharCode(65 + rowIndex)}
-                    </span>
+                {sections.map((row, rowIndex) => {
+                  const isLastRow = rowIndex === lastRowIndex
 
-                    {row.map(seat => {
-                      const isSelected = selectedSeats.includes(seat.id)
-                      const isBooked = seat.is_booked
-                      return (
-                        <motion.button
-                          key={seat.id}
-                          whileHover={{ scale: isBooked ? 1 : 1.08 }}
-                          whileTap={{ scale: isBooked ? 1 : 0.92 }}
-                          onClick={() => toggleSeat(seat.id)}
-                          disabled={isBooked}
-                          title={isBooked ? 'Already booked' : seat.seat_number}
-                          className={`
-                            w-10 h-10 rounded-lg border-2 text-[11px] font-bold transition-all duration-150 shrink-0
-                            ${isBooked
-                              ? 'bg-white/3 border-white/8 text-white/15 cursor-not-allowed'
-                              : isSelected
-                              ? styles.selected
-                              : styles.available
-                            }
-                          `}
-                        >
-                          {isBooked ? (
-                            <span className="text-white/20 text-base leading-none">×</span>
-                          ) : (
-                            seat.seat_number.replace(/[A-Za-z]+/, '')
-                          )}
-                        </motion.button>
-                      )
-                    })}
-                  </div>
-                ))}
+                  return (
+                    <div key={rowIndex} className="flex items-center">
+
+                      {/* Row letter */}
+                      <span className={`text-[10px] font-mono w-5 mr-2 text-right shrink-0 ${styles.label} opacity-40`}>
+                        {String.fromCharCode(65 + rowIndex)}
+                      </span>
+
+                      {/* Left block */}
+                      {row.left.length > 0 && (
+                        <div className="flex gap-1.5">
+                          {row.left.map(seat => (
+                            <SeatButton
+                              key={seat.id}
+                              seat={seat}
+                              selected={selectedSeats.includes(seat.id)}
+                              styles={styles}
+                              onToggle={toggleSeat}
+                            />
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Left aisle — hidden on last row */}
+                      {!isLastRow && row.left.length > 0 && (
+                        <div className="w-7 shrink-0 flex items-center justify-center">
+                          <div className="w-px h-4 bg-white/[0.06]" />
+                        </div>
+                      )}
+                      {isLastRow && row.left.length > 0 && <div className="w-1.5 shrink-0" />}
+
+                      {/* Center block */}
+                      {row.center.length > 0 && (
+                        <div className="flex gap-1.5 flex-wrap">
+                          {row.center.map(seat => (
+                            <SeatButton
+                              key={seat.id}
+                              seat={seat}
+                              selected={selectedSeats.includes(seat.id)}
+                              styles={styles}
+                              onToggle={toggleSeat}
+                            />
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Right aisle — hidden on last row */}
+                      {!isLastRow && row.right.length > 0 && (
+                        <div className="w-7 shrink-0 flex items-center justify-center">
+                          <div className="w-px h-4 bg-white/[0.06]" />
+                        </div>
+                      )}
+                      {isLastRow && row.right.length > 0 && <div className="w-1.5 shrink-0" />}
+
+                      {/* Right block */}
+                      {row.right.length > 0 && (
+                        <div className="flex gap-1.5">
+                          {row.right.map(seat => (
+                            <SeatButton
+                              key={seat.id}
+                              seat={seat}
+                              selected={selectedSeats.includes(seat.id)}
+                              styles={styles}
+                              onToggle={toggleSeat}
+                            />
+                          ))}
+                        </div>
+                      )}
+
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )
@@ -270,15 +359,15 @@ export default function SeatSelectionPage() {
         )}
 
         {/* Legend */}
-        <div className="flex items-center gap-5 mt-6 flex-wrap">
+        <div className="flex items-center gap-5 mt-4 flex-wrap">
           {[
-            { label: 'Available', cls: 'border-2 border-gray-500' },
-            { label: 'Selected', cls: 'bg-white/80' },
+            { label: 'Available', cls: 'border-2 border-gray-600' },
+            { label: 'Selected', cls: 'bg-white/70' },
             { label: 'Booked', cls: 'bg-white/5 border border-white/10' },
           ].map(({ label, cls }) => (
             <div key={label} className="flex items-center gap-2">
               <div className={`w-4 h-4 rounded-md ${cls}`} />
-              <span className="text-gray-500 text-xs">{label}</span>
+              <span className="text-gray-600 text-xs">{label}</span>
             </div>
           ))}
         </div>
@@ -295,24 +384,21 @@ export default function SeatSelectionPage() {
             transition={{ type: 'spring', damping: 24, stiffness: 300 }}
             className="fixed bottom-0 left-0 right-0 z-50"
           >
-            {/* Blur backdrop */}
-            <div className="bg-[#111111]/95 backdrop-blur-xl border-t border-white/8 px-4 py-4">
+            <div className="bg-[#111111]/95 backdrop-blur-xl border-t border-white/[0.08] px-4 py-4">
               <div className="max-w-5xl mx-auto">
 
                 {/* Timer */}
                 {timeLeft !== null && (
-                  <div className={`flex items-center gap-1.5 text-xs font-medium mb-3 ${
+                  <div className={`flex items-center gap-2 text-xs font-medium mb-3 ${
                     timeLeft <= 60 ? 'text-red-400' : 'text-yellow-500/80'
                   }`}>
                     <Timer size={12} />
-                    <span>
-                      {timeLeft <= 60 ? '⚠ Hurry! ' : ''}
-                      Selection expires in {formatTime(timeLeft)}
-                    </span>
-                    {/* Progress bar */}
-                    <div className="flex-1 h-0.5 bg-white/8 rounded-full overflow-hidden ml-2">
+                    <span>{timeLeft <= 60 ? '⚠ Hurry! ' : ''}Expires in {formatTime(timeLeft)}</span>
+                    <div className="flex-1 h-0.5 bg-white/[0.08] rounded-full overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all duration-1000 ${timeLeft <= 60 ? 'bg-red-500' : 'bg-yellow-500'}`}
+                        className={`h-full rounded-full transition-all duration-1000 ${
+                          timeLeft <= 60 ? 'bg-red-500' : 'bg-yellow-500'
+                        }`}
                         style={{ width: `${(timeLeft / 300) * 100}%` }}
                       />
                     </div>
@@ -320,7 +406,6 @@ export default function SeatSelectionPage() {
                 )}
 
                 <div className="flex items-center justify-between gap-4">
-                  {/* Left: breakdown */}
                   <div className="min-w-0">
                     <div className="flex flex-wrap gap-x-3 gap-y-0.5 mb-1">
                       {Object.entries(selectedBreakdown).map(([cat, { count, price }]) => (
@@ -335,7 +420,6 @@ export default function SeatSelectionPage() {
                     </div>
                   </div>
 
-                  {/* Right: CTA */}
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.97 }}
@@ -346,6 +430,7 @@ export default function SeatSelectionPage() {
                     Proceed · {selectedSeats.length} seat{selectedSeats.length > 1 ? 's' : ''}
                   </motion.button>
                 </div>
+
               </div>
             </div>
           </motion.div>
@@ -384,6 +469,7 @@ export default function SeatSelectionPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
     </div>
   )
 }
