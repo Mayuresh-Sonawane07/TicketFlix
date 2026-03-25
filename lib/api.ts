@@ -248,8 +248,8 @@ export const paymentAPI = {
     razorpay_order_id: string
     razorpay_payment_id: string
     razorpay_signature: string
-    show: number
-    seats: number[]
-    total_amount: number
+    // show: number
+    // seats: number[]
+    // total_amount: number
   }) => apiClient.post('/payments/verify/', data),
 }
