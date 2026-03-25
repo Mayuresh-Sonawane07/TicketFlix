@@ -10,12 +10,14 @@ interface TicketData {
   eventType: string
   showTime: string
   theaterName?: string
-  seats: number[]
+  screenNumber?: string | number
+  seats: any[]
   totalAmount: number
   status: string
   bookingTime: string
   userEmail?: string
   transactionId?: string
+  qrCodeUrl?: string
 }
 
 export default function DownloadTicket({ booking }: { booking: any }) {
@@ -24,176 +26,321 @@ export default function DownloadTicket({ booking }: { booking: any }) {
   const generatePDF = async () => {
     setGenerating(true)
     try {
-      // Build ticket data from booking
       const ticket: TicketData = {
         bookingId: booking.id,
         eventTitle: booking.show_details?.event?.title || `Show #${booking.show}`,
         eventType: booking.show_details?.event?.event_type || 'EVENT',
         showTime: booking.show_details?.show_time || '',
         theaterName: booking.show_details?.theater_name || 'Venue',
+        screenNumber: booking.show_details?.screen_number || '',
         seats: booking.seats || [],
         totalAmount: booking.total_amount,
         status: booking.status,
         bookingTime: booking.booking_time,
         userEmail: booking.user_email || '',
         transactionId: booking.transaction_id || '',
+        qrCodeUrl: booking.qr_code || booking.qrCode || booking.qr_code_url || '',
       }
 
-      // Dynamically import jsPDF
       const { jsPDF } = await import('jspdf')
+
+      // ── Canvas dimensions: tall ticket format ──
+      const W = 210
+      const H = 297
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
-      const W = 210
-      const pageH = 297
+      // ── Helper: rounded rect with gradient simulation ──
+      const fillRect = (x: number, y: number, w: number, h: number, r: number, fill: number[]) => {
+        doc.setFillColor(fill[0], fill[1], fill[2])
+        doc.roundedRect(x, y, w, h, r, r, 'F')
+      }
 
-      // ── Background ──
-      doc.setFillColor(10, 10, 15)
-      doc.rect(0, 0, W, pageH, 'F')
+      // ════════════════════════════════════════════════════
+      //  BACKGROUND — deep charcoal with subtle texture
+      // ════════════════════════════════════════════════════
+      doc.setFillColor(8, 8, 12)
+      doc.rect(0, 0, W, H, 'F')
 
-      // ── Red header bar ──
+      // Subtle grid lines for texture
+      doc.setDrawColor(18, 18, 28)
+      doc.setLineWidth(0.15)
+      for (let i = 0; i < H; i += 8) doc.line(0, i, W, i)
+      for (let i = 0; i < W; i += 8) doc.line(i, 0, i, H)
+
+      // ════════════════════════════════════════════════════
+      //  MAIN TICKET CARD — centered, with soft border glow
+      // ════════════════════════════════════════════════════
+      const cardX = 12
+      const cardY = 14
+      const cardW = W - 24
+      const cardH = H - 28
+
+      // Outer glow layer
       doc.setFillColor(220, 38, 38)
-      doc.rect(0, 0, W, 42, 'F')
+      doc.setGState(doc.GState({ opacity: 0.08 }))
+      doc.roundedRect(cardX - 1, cardY - 1, cardW + 2, cardH + 2, 6, 6, 'F')
+      doc.setGState(doc.GState({ opacity: 1 }))
 
-      // ── TicketFlix branding ──
+      // Card body
+      doc.setFillColor(13, 13, 20)
+      doc.roundedRect(cardX, cardY, cardW, cardH, 5, 5, 'F')
+      doc.setDrawColor(35, 35, 52)
+      doc.setLineWidth(0.4)
+      doc.roundedRect(cardX, cardY, cardW, cardH, 5, 5, 'S')
+
+      // ════════════════════════════════════════════════════
+      //  HEADER STRIP — cinematic red gradient
+      // ════════════════════════════════════════════════════
+      const hdrY = cardY
+      const hdrH = 38
+
+      // Red header fill
+      doc.setFillColor(180, 22, 22)
+      doc.roundedRect(cardX, hdrY, cardW, hdrH, 5, 5, 'F')
+      // Flatten bottom corners
+      doc.setFillColor(180, 22, 22)
+      doc.rect(cardX, hdrY + hdrH - 6, cardW, 6, 'F')
+
+      // Diagonal accent stripe
+      doc.setFillColor(220, 38, 38)
+      doc.setGState(doc.GState({ opacity: 0.4 }))
+      doc.triangle(cardX + cardW - 50, hdrY, cardX + cardW, hdrY, cardX + cardW, hdrY + hdrH, 'F')
+      doc.setGState(doc.GState({ opacity: 1 }))
+
+      // Brand name
       doc.setTextColor(255, 255, 255)
-      doc.setFontSize(26)
+      doc.setFontSize(22)
       doc.setFont('helvetica', 'bold')
-      doc.text('TicketFlix', 14, 20)
+      doc.text('TicketFlix', cardX + 10, hdrY + 17)
 
-      doc.setFontSize(10)
+      // Tagline
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(255, 190, 190)
+      doc.text('Your Official Booking Ticket', cardX + 10, hdrY + 27)
+
+      // Booking # and date (top right)
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(255, 255, 255)
+      doc.text(`Booking #${ticket.bookingId}`, cardX + cardW - 10, hdrY + 15, { align: 'right' })
+
+      doc.setFontSize(7.5)
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(255, 200, 200)
-      doc.text('Your Official Booking Ticket', 14, 30)
+      const bTime = ticket.bookingTime
+        ? new Date(ticket.bookingTime).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+        : ''
+      doc.text(bTime, cardX + cardW - 10, hdrY + 24, { align: 'right' })
 
-      // Booking ID top right
-      doc.setFontSize(10)
-      doc.setTextColor(255, 200, 200)
-      doc.text(`Booking #${ticket.bookingId}`, W - 14, 20, { align: 'right' })
-      doc.setFontSize(8)
-      doc.text(new Date(ticket.bookingTime).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }), W - 14, 28, { align: 'right' })
-
-      // ── Status badge ──
-      const statusColor = ticket.status === 'Booked' ? [22, 163, 74] : [220, 38, 38]
-      doc.setFillColor(statusColor[0], statusColor[1], statusColor[2])
-      doc.roundedRect(W - 46, 34, 32, 7, 2, 2, 'F')
+      // Status pill
+      const isConfirmed = ticket.status === 'Booked' || ticket.status === 'confirmed'
+      doc.setFillColor(isConfirmed ? 22 : 220, isConfirmed ? 163 : 38, isConfirmed ? 74 : 38)
+      doc.roundedRect(cardX + cardW - 38, hdrY + 27, 28, 8, 2, 2, 'F')
       doc.setTextColor(255, 255, 255)
-      doc.setFontSize(8)
+      doc.setFontSize(7)
       doc.setFont('helvetica', 'bold')
-      doc.text(ticket.status.toUpperCase(), W - 30, 39.5, { align: 'center' })
+      doc.text(ticket.status.toUpperCase(), cardX + cardW - 24, hdrY + 33, { align: 'center' })
 
-      // ── Event card ──
-      doc.setFillColor(20, 20, 30)
-      doc.roundedRect(12, 50, W - 24, 55, 4, 4, 'F')
-      doc.setDrawColor(60, 60, 80)
-      doc.setLineWidth(0.3)
-      doc.roundedRect(12, 50, W - 24, 55, 4, 4, 'S')
+      // ════════════════════════════════════════════════════
+      //  EVENT SECTION
+      // ════════════════════════════════════════════════════
+      let y = hdrY + hdrH + 10
 
       // Event type badge
       doc.setFillColor(220, 38, 38)
-      doc.roundedRect(18, 56, 22, 6, 2, 2, 'F')
+      doc.roundedRect(cardX + 10, y, 26, 6.5, 1.5, 1.5, 'F')
       doc.setTextColor(255, 255, 255)
-      doc.setFontSize(7)
+      doc.setFontSize(6.5)
       doc.setFont('helvetica', 'bold')
-      doc.text(ticket.eventType, 29, 60.5, { align: 'center' })
+      doc.text(ticket.eventType.toUpperCase(), cardX + 23, y + 4.5, { align: 'center' })
 
-      // Event title
-      doc.setFontSize(20)
+      y += 12
+      // Event title — large, bold
+      doc.setFontSize(24)
       doc.setFont('helvetica', 'bold')
       doc.setTextColor(255, 255, 255)
-      doc.text(ticket.eventTitle, 18, 74)
+      // Truncate long titles
+      const maxTitleW = cardW - 20
+      let title = ticket.eventTitle
+      while (doc.getTextWidth(title) > maxTitleW && title.length > 4) title = title.slice(0, -1)
+      if (title !== ticket.eventTitle) title += '…'
+      doc.text(title, cardX + 10, y)
 
-      // Show time
+      y += 5
+      // Decorative red underline
+      doc.setDrawColor(220, 38, 38)
+      doc.setLineWidth(1.2)
+      doc.line(cardX + 10, y, cardX + 10 + Math.min(doc.getTextWidth(ticket.eventTitle), maxTitleW), y)
+      doc.setLineWidth(0.3)
+
+      y += 10
+      // Date & time row
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(200, 200, 220)
       if (ticket.showTime) {
-        doc.setFontSize(11)
-        doc.setFont('helvetica', 'normal')
-        doc.setTextColor(180, 180, 200)
         const showDate = new Date(ticket.showTime).toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short' })
-        doc.text(`📅  ${showDate}`, 18, 84)
+        doc.text(`${showDate}`, cardX + 10, y)
+        y += 9
       }
 
-      // Theater
-      if (ticket.theaterName) {
-        doc.setFontSize(10)
-        doc.setTextColor(150, 150, 170)
-        doc.text(`📍  ${ticket.theaterName}`, 18, 93)
-      }
+      // Venue row
+      doc.setFontSize(9.5)
+      doc.setTextColor(140, 140, 165)
+      const venueStr = [ticket.theaterName, ticket.screenNumber ? `Screen ${ticket.screenNumber}` : ''].filter(Boolean).join('  ·  ')
+      doc.text(venueStr, cardX + 10, y)
 
-      // ── Divider with circles (ticket tear effect) ──
-      doc.setDrawColor(60, 60, 80)
-      doc.setLineWidth(0.5)
-      doc.setLineDashPattern([3, 3], 0)
-      doc.line(12, 116, W - 12, 116)
+      // ════════════════════════════════════════════════════
+      //  PERFORATED DIVIDER
+      // ════════════════════════════════════════════════════
+      y += 14
+      const divY = y
+      // Left notch
+      doc.setFillColor(8, 8, 12)
+      doc.circle(cardX, divY, 4, 'F')
+      // Right notch
+      doc.circle(cardX + cardW, divY, 4, 'F')
+      // Dashed line
+      doc.setDrawColor(40, 40, 60)
+      doc.setLineWidth(0.6)
+      doc.setLineDashPattern([2.5, 2.5], 0)
+      doc.line(cardX + 4, divY, cardX + cardW - 4, divY)
       doc.setLineDashPattern([], 0)
-      doc.setFillColor(10, 10, 15)
-      doc.circle(12, 116, 3, 'F')
-      doc.circle(W - 12, 116, 3, 'F')
 
-      // ── Info grid ──
-      const infoY = 125
-      const colW = (W - 24) / 3
-      const infoCols = [
-        { label: 'SEATS', value: `${ticket.seats.length} Seat${ticket.seats.length > 1 ? 's' : ''}` },
-        { label: 'AMOUNT PAID', value: `Rs.${Number(ticket.totalAmount).toLocaleString('en-IN')}` },
-        { label: 'PAYMENT', value: ticket.status === 'Booked' ? 'Confirmed' : ticket.status },
+      // ════════════════════════════════════════════════════
+      //  STATS STRIP  (seats / amount / payment)
+      // ════════════════════════════════════════════════════
+      y = divY + 10
+      const statsW = cardW - 20
+      const statCols = [
+        { label: 'SEATS',       value: `${ticket.seats.length} Seat${ticket.seats.length !== 1 ? 's' : ''}` },
+        { label: 'AMOUNT PAID', value: `₹${Number(ticket.totalAmount).toLocaleString('en-IN')}` },
+        { label: 'PAYMENT',     value: isConfirmed ? 'Confirmed' : ticket.status },
       ]
+      const colW = statsW / 3
 
-      infoCols.forEach((col, i) => {
-        const x = 14 + i * colW
-        doc.setFillColor(20, 20, 30)
-        doc.roundedRect(x, infoY, colW - 4, 22, 3, 3, 'F')
-        doc.setDrawColor(60, 60, 80)
+      statCols.forEach((col, i) => {
+        const cx = cardX + 10 + i * colW
+        // Card bg
+        doc.setFillColor(20, 20, 32)
+        doc.roundedRect(cx, y, colW - 4, 22, 3, 3, 'F')
+        doc.setDrawColor(38, 38, 58)
         doc.setLineWidth(0.3)
-        doc.roundedRect(x, infoY, colW - 4, 22, 3, 3, 'S')
-        doc.setFontSize(7)
+        doc.roundedRect(cx, y, colW - 4, 22, 3, 3, 'S')
+        // Label
+        doc.setFontSize(6.5)
         doc.setFont('helvetica', 'normal')
-        doc.setTextColor(120, 120, 140)
-        doc.text(col.label, x + (colW - 4) / 2, infoY + 7, { align: 'center' })
+        doc.setTextColor(100, 100, 130)
+        doc.text(col.label, cx + (colW - 4) / 2, y + 7.5, { align: 'center' })
+        // Value
         doc.setFontSize(11)
         doc.setFont('helvetica', 'bold')
-        doc.setTextColor(255, 255, 255)
-        doc.text(col.value, x + (colW - 4) / 2, infoY + 16, { align: 'center' })
+        doc.setTextColor(i === 2 && isConfirmed ? 74 : 255, i === 2 && isConfirmed ? 222 : 255, i === 2 && isConfirmed ? 128 : 255)
+        doc.text(col.value, cx + (colW - 4) / 2, y + 17, { align: 'center' })
       })
 
-      // ── Transaction ID ──
+      // ════════════════════════════════════════════════════
+      //  TRANSACTION ID
+      // ════════════════════════════════════════════════════
+      y += 30
       if (ticket.transactionId) {
-        doc.setFontSize(8)
+        doc.setFontSize(7.5)
         doc.setFont('helvetica', 'normal')
-        doc.setTextColor(100, 100, 120)
-        doc.text(`Transaction ID: ${ticket.transactionId}`, W / 2, 158, { align: 'center' })
+        doc.setTextColor(70, 70, 95)
+        doc.text(`Transaction ID: ${ticket.transactionId}`, W / 2, y, { align: 'center' })
+        y += 8
       }
 
-      // ── QR code placeholder ──
-      const qrY = 165
-      doc.setFillColor(20, 20, 30)
-      doc.roundedRect(W / 2 - 25, qrY, 50, 50, 4, 4, 'F')
-      doc.setDrawColor(80, 80, 100)
-      doc.setLineWidth(0.5)
-      doc.roundedRect(W / 2 - 25, qrY, 50, 50, 4, 4, 'S')
+      // ════════════════════════════════════════════════════
+      //  QR CODE — embed the real QR image
+      // ════════════════════════════════════════════════════
+      const qrSize = 52
+      const qrX = W / 2 - qrSize / 2
+      const qrY2 = y + 4
 
-      // Draw QR pattern (decorative)
-      doc.setFillColor(220, 38, 38)
-      ;[[0,0],[0,1],[0,2],[1,0],[2,0],[2,1],[2,2],[1,2],
-        [4,0],[5,0],[6,0],[4,1],[6,1],[4,2],[5,2],[6,2],
-        [0,4],[1,4],[2,4],[0,5],[2,5],[0,6],[1,6],[2,6],
-        [3,3],[4,4],[5,5],[3,5],[5,3]
-      ].forEach(([col, row]) => {
-        doc.rect(W/2 - 22 + col * 5, qrY + 7 + row * 5, 4, 4, 'F')
-      })
+      // QR card background
+      doc.setFillColor(255, 255, 255)
+      doc.roundedRect(qrX - 5, qrY2 - 5, qrSize + 10, qrSize + 18, 4, 4, 'F')
+
+      // Embed real QR if available
+      if (ticket.qrCodeUrl) {
+        try {
+          // Fetch QR as base64
+          const res = await fetch(ticket.qrCodeUrl)
+          const blob = await res.blob()
+          const b64: string = await new Promise((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onloadend = () => resolve(reader.result as string)
+            reader.onerror = reject
+            reader.readAsDataURL(blob)
+          })
+          const ext = blob.type.includes('png') ? 'PNG' : 'JPEG'
+          doc.addImage(b64, ext, qrX, qrY2, qrSize, qrSize)
+        } catch {
+          // Fallback: draw placeholder
+          doc.setFillColor(240, 240, 240)
+          doc.rect(qrX, qrY2, qrSize, qrSize, 'F')
+          doc.setTextColor(150, 150, 150)
+          doc.setFontSize(8)
+          doc.text('QR Code', qrX + qrSize / 2, qrY2 + qrSize / 2, { align: 'center' })
+        }
+      } else {
+        doc.setFillColor(240, 240, 240)
+        doc.rect(qrX, qrY2, qrSize, qrSize, 'F')
+        doc.setTextColor(150, 150, 150)
+        doc.setFontSize(8)
+        doc.text('QR Code', qrX + qrSize / 2, qrY2 + qrSize / 2, { align: 'center' })
+      }
+
+      // QR label inside white card
+      doc.setFontSize(7)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(100, 100, 100)
+      doc.text('Scan at Entry', W / 2, qrY2 + qrSize + 5, { align: 'center' })
+      doc.setFontSize(6.5)
+      doc.setTextColor(150, 150, 150)
+      doc.text(`#TF${String(ticket.bookingId).padStart(6, '0')}`, W / 2, qrY2 + qrSize + 11, { align: 'center' })
+
+      // ════════════════════════════════════════════════════
+      //  SEAT LIST (if seats have numbers)
+      // ════════════════════════════════════════════════════
+      const seatNums = ticket.seats
+        .map((s: any) => s?.seat_number || s?.seatNumber || (typeof s === 'string' ? s : null))
+        .filter(Boolean)
+
+      if (seatNums.length > 0) {
+        const seatY = qrY2 + qrSize + 22
+        doc.setFontSize(7)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(70, 70, 95)
+        doc.text('SEAT(S):', W / 2, seatY, { align: 'center' })
+        doc.setFontSize(8.5)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(200, 200, 220)
+        doc.text(seatNums.join('  ·  '), W / 2, seatY + 7, { align: 'center' })
+      }
+
+      // ════════════════════════════════════════════════════
+      //  FOOTER
+      // ════════════════════════════════════════════════════
+      const ftY = cardY + cardH - 14
+      doc.setDrawColor(28, 28, 42)
+      doc.setLineWidth(0.3)
+      doc.line(cardX + 10, ftY - 3, cardX + cardW - 10, ftY - 3)
 
       doc.setFontSize(7)
-      doc.setTextColor(100, 100, 120)
-      doc.text(`#TF${String(ticket.bookingId).padStart(6, '0')}`, W / 2, qrY + 46, { align: 'center' })
-
-      // ── Footer ──
-      doc.setFillColor(20, 20, 30)
-      doc.rect(0, pageH - 20, W, 20, 'F')
-      doc.setFontSize(8)
-      doc.setTextColor(80, 80, 100)
-      doc.text('This is an official TicketFlix booking confirmation. Please carry this ticket to the venue.', W / 2, pageH - 12, { align: 'center' })
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 80)
+      doc.text(
+        'This is an official TicketFlix booking confirmation. Please carry this ticket to the venue.',
+        W / 2, ftY + 3, { align: 'center' }
+      )
       doc.setTextColor(220, 38, 38)
-      doc.text('www.ticketflix.com', W / 2, pageH - 5, { align: 'center' })
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'bold')
+      doc.text('www.ticketflix.com', W / 2, ftY + 10, { align: 'center' })
 
-      // Save
       doc.save(`TicketFlix-Booking-${ticket.bookingId}.pdf`)
     } catch (err) {
       console.error('PDF generation failed:', err)
@@ -214,7 +361,7 @@ export default function DownloadTicket({ booking }: { booking: any }) {
       className="flex items-center gap-1.5 px-3 py-1.5 border border-green-600/40 text-green-400 rounded-lg hover:bg-green-600/10 transition text-xs font-medium disabled:opacity-50"
     >
       <Download size={13} />
-      {generating ? 'Generating...' : 'Download Ticket'}
+      {generating ? 'Generating…' : 'Download Ticket'}
     </motion.button>
   )
 }
