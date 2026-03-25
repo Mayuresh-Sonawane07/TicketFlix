@@ -135,12 +135,23 @@ export default function SeatSelectionPage() {
       return
     }
 
+    const title = (show as any)?.event_details?.title || 'Event'
+    const venue = (show as any)?.theater_name
+      ? `${(show as any).theater_name} · Screen ${(show as any).screen_number}`
+      : 'Venue'
+    const time = show?.show_time
+      ? new Date(show.show_time).toLocaleString('en-IN', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        })
+      : ''
+
     const params = new URLSearchParams({
       showId: showId as string,
       seats: selectedSeats.join(','),
-      eventTitle: (show as any)?.event_details?.title || 'Event',
-      theaterName: (show as any)?.theater_name || 'Venue',
-      showTime: show?.show_time || '',
+      title: title,
+      time: time,
+      venue: venue,
     })
 
     router.push(`/checkout?${params.toString()}`)
