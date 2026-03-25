@@ -35,6 +35,7 @@ function CheckoutContent() {
   const createOrder = async () => {
     try {
       const res = await paymentAPI.createOrder({ show: showId, seats })
+      console.log('orderData:', res.data)
       setOrderData(res.data)
     } catch (err: any) {
       setError('Failed to create order.')
