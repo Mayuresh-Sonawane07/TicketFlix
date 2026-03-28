@@ -43,8 +43,8 @@ function fmtDate(d: string) {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function StatCard({ label, value, icon, accent = 'red', sub }: {
-  label: string; value: string | number; icon: React.ReactNode; accent?: string; sub?: string
+function StatCard({ label, value, icon, accent = 'red', sub, onClick }: {
+  label: string; value: string | number; icon: React.ReactNode; accent?: string; sub?: string; onClick?: () => void
 }) {
   const accents: Record<string, string> = {
     red:    'border-red-500/30 bg-red-500/5',
@@ -64,7 +64,8 @@ function StatCard({ label, value, icon, accent = 'red', sub }: {
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`border rounded-xl p-5 ${accents[accent]}`}
+      onClick={onClick}
+      className={`border rounded-xl p-5 ${accents[accent]}${onClick ? 'cursor-pointer hover:brightness-125 transition-all' : ''}`}
     >
       <div className="flex items-start justify-between mb-3">
         <span className={`${iconAccents[accent]}`}>{icon}</span>
@@ -149,7 +150,7 @@ function ConfirmModal({ message, onConfirm, onCancel, extraInput }: {
 
 // ─── Tab: Dashboard ───────────────────────────────────────────────────────────
 
-function DashboardTab() {
+function DashboardTab({ setTab }: { setTab: (t: Tab) => void }) {
   const [stats, setStats] = useState<DashStats | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -165,31 +166,31 @@ function DashboardTab() {
       <div>
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-4">Users</h2>
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <StatCard label="Total Users"       value={fmt(stats.users.total)}            icon={<Users size={20}/>}         accent="blue" />
-          <StatCard label="Customers"         value={fmt(stats.users.customers)}        icon={<Users size={20}/>}         accent="blue" />
-          <StatCard label="Venue Owners"      value={fmt(stats.users.venue_owners)}     icon={<Users size={20}/>}         accent="purple" />
-          <StatCard label="Pending Approvals" value={fmt(stats.users.pending_approvals)} icon={<Clock size={20}/>}        accent="yellow" sub="action needed" />
-          <StatCard label="Banned"            value={fmt(stats.users.banned)}           icon={<Ban size={20}/>}           accent="red" />
+          <StatCard label="Total Users"       value={fmt(stats.users.total)}            icon={<Users size={20}/>}         accent="blue"         onClick={() => setTab('users')} />
+          <StatCard label="Customers"         value={fmt(stats.users.customers)}        icon={<Users size={20}/>}         accent="blue"         onClick={() => setTab('users')} />
+          <StatCard label="Venue Owners"      value={fmt(stats.users.venue_owners)}     icon={<Users size={20}/>}         accent="purple"         onClick={() => setTab('venue-owners')} />
+          <StatCard label="Pending Approvals" value={fmt(stats.users.pending_approvals)} icon={<Clock size={20}/>}        accent="yellow" sub="action needed"         onClick={() => setTab('venue-owners')} />
+          <StatCard label="Banned"            value={fmt(stats.users.banned)}           icon={<Ban size={20}/>}           accent="red"         onClick={() => setTab('users')} />
         </div>
       </div>
 
       <div>
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-4">Events</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="Total Events"  value={fmt(stats.events.total)}    icon={<CalendarDays size={20}/>} accent="blue" />
-          <StatCard label="Pending"       value={fmt(stats.events.pending)}  icon={<Clock size={20}/>}        accent="yellow" sub="needs review" />
-          <StatCard label="Approved"      value={fmt(stats.events.approved)} icon={<CheckCircle2 size={20}/>} accent="green" />
-          <StatCard label="Flagged"       value={fmt(stats.events.flagged)}  icon={<Flag size={20}/>}         accent="red" />
+          <StatCard label="Total Events"  value={fmt(stats.events.total)}    icon={<CalendarDays size={20}/>} accent="blue" onClick={() => setTab('events')} />
+          <StatCard label="Pending"       value={fmt(stats.events.pending)}  icon={<Clock size={20}/>}        accent="yellow" sub="needs review" onClick={() => setTab('events')} />
+          <StatCard label="Approved"      value={fmt(stats.events.approved)} icon={<CheckCircle2 size={20}/>} accent="green" onClick={() => setTab('events')} />
+          <StatCard label="Flagged"       value={fmt(stats.events.flagged)}  icon={<Flag size={20}/>}         accent="red" onClick={() => setTab('events')} />
         </div>
       </div>
 
       <div>
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-4">Revenue & Bookings</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="Total Revenue"   value={fmtCurrency(stats.revenue.total)}        icon={<DollarSign size={20}/>}  accent="green" />
-          <StatCard label="Last 7 Days"     value={fmtCurrency(stats.revenue.last_7_days)}  icon={<TrendingUp size={20}/>}  accent="green" />
-          <StatCard label="Total Bookings"  value={fmt(stats.bookings.total)}               icon={<Ticket size={20}/>}      accent="blue" />
-          <StatCard label="Cancelled"       value={fmt(stats.bookings.cancelled)}           icon={<XCircle size={20}/>}     accent="red" />
+          <StatCard label="Total Revenue"   value={fmtCurrency(stats.revenue.total)}        icon={<DollarSign size={20}/>}  accent="green" onClick={() => setTab('revenue')} />
+          <StatCard label="Last 7 Days"     value={fmtCurrency(stats.revenue.last_7_days)}  icon={<TrendingUp size={20}/>}  accent="green" onClick={() => setTab('revenue')} />
+          <StatCard label="Total Bookings"  value={fmt(stats.bookings.total)}               icon={<Ticket size={20}/>}      accent="blue" onClick={() => setTab('bookings')} />
+          <StatCard label="Cancelled"       value={fmt(stats.bookings.cancelled)}           icon={<XCircle size={20}/>}     accent="red" onClick={() => setTab('bookings')} />
         </div>
       </div>
 
@@ -804,7 +805,7 @@ export default function AdminPanelPage() {
   )
 
   const tabContent: Record<Tab, React.ReactNode> = {
-    'dashboard':     <DashboardTab />,
+    'dashboard':     <DashboardTab setTab={setTab} />,
     'venue-owners':  <VenueOwnersTab />,
     'users':         <UsersTab />,
     'events':        <EventsTab />,
