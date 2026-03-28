@@ -414,6 +414,10 @@ function EventsTab() {
                   <ActionBtn label="Approve" icon={<Check size={12}/>} variant="success"
                     onClick={() => setConfirm({ msg: `Approve "${e.title}"?`, action: () => act(e.id, 'approve') })} />
                 )}
+                {e.status === 'flagged' && (
+                  <ActionBtn label="Unflag" icon={<CheckCircle2 size={12}/>} variant="success"
+                    onClick={() => setConfirm({ msg: `Unflag "${e.title}" and mark as approved?`, action: () => act(e.id, 'unflag') })} />
+                )}
                 {e.status !== 'flagged' && (
                   <ActionBtn label="Flag" icon={<Flag size={12}/>} variant="warn"
                     onClick={() => setConfirm({ msg: `Flag "${e.title}"? Add a note:`, input: 'Reason for flagging', action: () => act(e.id, 'flag') })} />
