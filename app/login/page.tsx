@@ -28,7 +28,7 @@ export default function Login() {
     if (err?.response?.status === 401)
       return 'Incorrect email or password. Please try again.'
     if (err?.response?.status === 403)
-      return 'Your account is not verified. Please register again.'
+      return err?.response?.data?.error || 'Access denied.'
     if (err?.response?.status === 0 || err?.code === 'ERR_NETWORK')
       return 'Cannot connect to server. Please check your internet.'
     return err?.response?.data?.error || 'Login failed. Please try again.'
@@ -39,7 +39,9 @@ export default function Login() {
     localStorage.setItem('refreshToken', refresh)
     localStorage.setItem('user', JSON.stringify(user))
     window.dispatchEvent(new Event('authChange'))
-    router.push(user.role === 'VENUE_OWNER' ? '/venue-dashboard' : '/')
+    if (user.role === 'Admin') router.push('/admin-panel')
+    else if (user.role === 'VENUE_OWNER') router.push('/venue-dashboard')
+    else router.push('/')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
