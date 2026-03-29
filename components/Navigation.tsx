@@ -16,8 +16,6 @@ interface UserData {
   role: string
 }
 
-// ── City Context (shared with page) ─────────────────────────────
-// We use a custom event to communicate city changes to page.tsx
 function dispatchCityChange(city: string) {
   window.dispatchEvent(new CustomEvent('cityChange', { detail: city }))
 }
@@ -28,6 +26,7 @@ export default function Navigation() {
   const { wishlist } = useWishlist()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [user, setUser] = useState<UserData | null>(null)
+  const [mounted, setMounted] = useState(false)
 
   // ── City state ────────────────────────────────────────────────
   const [selectedCity, setSelectedCity] = useState<string>('All Cities')
@@ -126,14 +125,31 @@ export default function Navigation() {
     const updateNav = () => {
       const token = localStorage.getItem('authToken')
       const userData = localStorage.getItem('user')
-      setIsLoggedIn(!!token)
-      if (userData) {
-        try { setUser(JSON.parse(userData)) } catch { setUser(null) }
+
+      const validToken = token && token !== 'undefined' && token !== 'null' && token.length > 10
+
+      if (validToken && userData) {
+        try {
+          const parsed = JSON.parse(userData)
+          if (parsed && parsed.role) {
+            setIsLoggedIn(true)
+            setUser(parsed)
+          } else {
+            setIsLoggedIn(false)
+            setUser(null)
+          }
+        } catch {
+          setIsLoggedIn(false)
+          setUser(null)
+        }
       } else {
+        setIsLoggedIn(false)
         setUser(null)
       }
     }
+
     updateNav()
+    setMounted(true)
     window.addEventListener('storage', updateNav)
     window.addEventListener('authChange', updateNav)
     return () => {
@@ -173,7 +189,7 @@ export default function Navigation() {
 
         <div className="flex items-center gap-4">
 
-          {/* ── City Selector (BookMyShow style) ── */}
+          {/* ── City Selector ── */}
           {!isVenueOwner && (
             <div className="relative" ref={dropdownRef}>
               <button
@@ -192,7 +208,6 @@ export default function Navigation() {
                 />
               </button>
 
-              {/* Dropdown */}
               <AnimatePresence>
                 {cityDropdownOpen && (
                   <motion.div
@@ -206,13 +221,10 @@ export default function Navigation() {
                         : 'bg-white border-gray-200'
                     }`}
                   >
-                    {/* Header */}
                     <div className={`px-4 py-3 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-100'}`}>
                       <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                         Select City
                       </p>
-
-                      {/* Search cities */}
                       <div className="relative">
                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                         <input
@@ -229,7 +241,6 @@ export default function Navigation() {
                       </div>
                     </div>
 
-                    {/* Detect Location */}
                     <div className={`px-4 py-2 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-100'}`}>
                       <button
                         onClick={detectLocation}
@@ -247,9 +258,7 @@ export default function Navigation() {
                       )}
                     </div>
 
-                    {/* City List */}
                     <div className="max-h-56 overflow-y-auto">
-                      {/* All Cities option */}
                       <button
                         onClick={() => selectCity('All Cities')}
                         className={`w-full text-left px-4 py-2.5 text-sm transition flex items-center justify-between ${
@@ -295,28 +304,46 @@ export default function Navigation() {
             </div>
           )}
 
-          {/* Nav Links */}
-          {!isLoggedIn && (
+          {/* ── Nav Links — mounted guard prevents localStorage flicker ── */}
+
+          {/* Not logged in */}
+          {mounted && !isLoggedIn && (
             <>
               <Link href="/" className={navLinkClass}>Events</Link>
-              <Link href="/login" className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+              <Link
+                href="/login"
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold text-sm"
+              >
                 Login
+              </Link>
+              <Link
+                href="/register"
+                className="px-4 py-2 border border-red-600 text-red-500 rounded-lg hover:bg-red-600/10 transition-colors font-semibold text-sm"
+              >
+                Register
               </Link>
             </>
           )}
 
-          {isLoggedIn && isCustomer && (
+          {/* Customer */}
+          {mounted && isLoggedIn && isCustomer && (
             <>
               <Link href="/" className={navLinkClass}>Events</Link>
               <Link href="/bookings" className={navLinkClass}>My Bookings</Link>
               <Link href="/venue-dashboard/profile" className={navLinkClass}>Profile</Link>
-              <button onClick={handleLogout} className={`flex items-center gap-2 transition-colors ${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-600 hover:text-red-500'}`}>
+              <button
+                onClick={handleLogout}
+                className={`flex items-center gap-2 transition-colors text-sm ${
+                  theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-600 hover:text-red-500'
+                }`}
+              >
                 <LogOut size={18} /> Logout
               </button>
             </>
           )}
 
-          {isLoggedIn && isVenueOwner && (
+          {/* Venue Owner */}
+          {mounted && isLoggedIn && isVenueOwner && (
             <>
               <Link href="/venue-dashboard" className={`flex items-center gap-1.5 ${navLinkClass}`}>
                 <LayoutDashboard size={16} /> Dashboard
@@ -333,19 +360,27 @@ export default function Navigation() {
               <Link href="/venue-dashboard/profile" className={`flex items-center gap-1.5 ${navLinkClass}`}>
                 <User size={16} /> Profile
               </Link>
-              <button onClick={handleLogout} className={`flex items-center gap-2 transition-colors ${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-600 hover:text-red-500'}`}>
+              <button
+                onClick={handleLogout}
+                className={`flex items-center gap-2 transition-colors text-sm ${
+                  theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-600 hover:text-red-500'
+                }`}
+              >
                 <LogOut size={18} /> Logout
               </button>
             </>
           )}
 
-          {/* Wishlist */}
-          {isLoggedIn && isCustomer && (
+          {/* Wishlist — customers only */}
+          {mounted && isLoggedIn && isCustomer && (
             <Link href="/wishlist" className="relative">
-              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+              <motion.div
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
                 className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors duration-300 ${
                   theme === 'dark' ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'
-                }`}>
+                }`}
+              >
                 <Heart size={18} className="text-red-500" />
                 {wishlist.length > 0 && (
                   <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white text-xs rounded-full flex items-center justify-center font-bold">
@@ -376,6 +411,7 @@ export default function Navigation() {
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </motion.div>
           </motion.button>
+
         </div>
       </div>
     </nav>
