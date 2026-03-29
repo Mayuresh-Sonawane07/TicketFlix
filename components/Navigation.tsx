@@ -126,7 +126,20 @@ export default function Navigation() {
       const token = localStorage.getItem('authToken')
       const userData = localStorage.getItem('user')
 
-      const validToken = token && token !== 'undefined' && token !== 'null' && token.length > 10
+      const isTokenExpired = (token: string) => {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]))
+          return payload.exp * 1000 < Date.now()
+        } catch {
+          return true
+        }
+      }
+
+      const validToken = token && 
+        token !== 'undefined' && 
+        token !== 'null' && 
+        token.length > 10 &&
+        !isTokenExpired(token)  // ← reject expired tokens
 
       if (validToken && userData) {
         try {
@@ -145,6 +158,9 @@ export default function Navigation() {
       } else {
         setIsLoggedIn(false)
         setUser(null)
+        localStorage.removeItem('authToken')
+        localStorage.removeItem('refreshToken')
+        localStorage.removeItem('user')
       }
     }
 
