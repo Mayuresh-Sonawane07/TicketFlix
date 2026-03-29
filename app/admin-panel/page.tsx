@@ -624,19 +624,39 @@ function FraudTab() {
     <div>
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-3">{title}</h3>
       {items.length === 0
-        ? <p className="text-gray-600 text-sm py-4 text-center border border-dashed border-gray-800 rounded-xl">No suspicious activity detected ✓</p>
-        : (
+        ? (
+          <p className="text-gray-600 text-sm py-4 text-center border border-dashed border-gray-800 rounded-xl">
+            No suspicious activity detected ✓
+          </p>
+        ) : (
           <div className="space-y-2">
             {items.map((item: any, i: number) => (
-              <div key={i} className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl px-5 py-3 flex items-center justify-between">
-                <p className="text-yellow-300 text-sm font-medium">{item['user__email']}</p>
-                <div className="flex gap-4">
+              <div key={i} className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl px-5 py-3 flex items-center justify-between gap-4">
+                <p className="text-yellow-300 text-sm font-medium truncate">{item['user__email']}</p>
+                <div className="flex items-center gap-4 shrink-0">
                   {cols.map(c => (
                     <div key={c} className="text-right">
                       <p className="text-yellow-400 font-bold text-sm">{item[c]}</p>
                       <p className="text-yellow-600 text-xs">{c.replace(/_/g, ' ')}</p>
                     </div>
                   ))}
+                  {/* Quick Ban button — avoids having to switch to Users tab */}
+                  <ActionBtn
+                    label="Ban"
+                    icon={<Ban size={12}/>}
+                    variant="danger"
+                    onClick={async () => {
+                      if (!window.confirm(`Ban ${item['user__email']} for suspicious activity?`)) return
+                      try {
+                        await apiClient.post(api(`/users/${item['user__id']}/`), {
+                          action: 'ban',
+                          reason: 'Suspicious booking activity detected by fraud monitoring',
+                        })
+                      } catch {
+                        alert('Failed to ban user. Check Users tab.')
+                      }
+                    }}
+                  />
                 </div>
               </div>
             ))}

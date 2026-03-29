@@ -3,7 +3,11 @@
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Film, LogOut, LayoutDashboard, CalendarPlus, List, User, MapPin, Sun, Moon, Heart, ChevronDown, Loader2, Search, X } from 'lucide-react'
+import {
+  Film, LogOut, LayoutDashboard, CalendarPlus, List, User,
+  MapPin, Sun, Moon, Heart, ChevronDown, Loader2, Search,
+  Bell,
+} from 'lucide-react'
 import { useTheme } from '@/components/ThemeProvider'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWishlist } from '@/hooks/useWishlist'
@@ -16,6 +20,14 @@ interface UserData {
   role: string
 }
 
+interface Notification {
+  id: number
+  title: string
+  message: string
+  type: string
+  created_at: string
+}
+
 function dispatchCityChange(city: string) {
   window.dispatchEvent(new CustomEvent('cityChange', { detail: city }))
 }
@@ -24,18 +36,24 @@ export default function Navigation() {
   const router = useRouter()
   const { theme, toggleTheme } = useTheme()
   const { wishlist } = useWishlist()
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [user, setUser] = useState<UserData | null>(null)
-  const [mounted, setMounted] = useState(false)
+  const [isLoggedIn, setIsLoggedIn]   = useState(false)
+  const [user, setUser]               = useState<UserData | null>(null)
+  const [mounted, setMounted]         = useState(false)
 
   // ── City state ────────────────────────────────────────────────
-  const [selectedCity, setSelectedCity] = useState<string>('All Cities')
+  const [selectedCity, setSelectedCity]       = useState<string>('All Cities')
   const [availableCities, setAvailableCities] = useState<string[]>([])
   const [cityDropdownOpen, setCityDropdownOpen] = useState(false)
-  const [citySearch, setCitySearch] = useState('')
+  const [citySearch, setCitySearch]           = useState('')
   const [detectingLocation, setDetectingLocation] = useState(false)
-  const [locationError, setLocationError] = useState('')
+  const [locationError, setLocationError]     = useState('')
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // ── Notification state ────────────────────────────────────────
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [notifOpen, setNotifOpen]         = useState(false)
+  const [unreadCount, setUnreadCount]     = useState(0)
+  const notifRef = useRef<HTMLDivElement>(null)
 
   // ── Fetch cities ──────────────────────────────────────────────
   useEffect(() => {
@@ -45,13 +63,16 @@ export default function Navigation() {
       .catch(() => {})
   }, [])
 
-  // ── Close dropdown on outside click ──────────────────────────
+  // ── Close dropdowns on outside click ─────────────────────────
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setCityDropdownOpen(false)
         setCitySearch('')
         setLocationError('')
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -60,50 +81,27 @@ export default function Navigation() {
 
   // ── Auto-detect location ──────────────────────────────────────
   const detectLocation = () => {
-    if (!navigator.geolocation) {
-      setLocationError('Geolocation not supported')
-      return
-    }
+    if (!navigator.geolocation) { setLocationError('Geolocation not supported'); return }
     setDetectingLocation(true)
     setLocationError('')
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
           const { latitude, longitude } = position.coords
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
-          )
+          const res  = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`)
           const data = await res.json()
-          const detectedCity =
-            data.address?.city ||
-            data.address?.town ||
-            data.address?.village ||
-            ''
-
-          if (!detectedCity) {
-            setLocationError('Could not determine your city')
-            return
-          }
-
-          const matched = availableCities.find(
-            c => c.toLowerCase() === detectedCity.toLowerCase()
-          )
-
-          if (matched) {
-            selectCity(matched)
-          } else {
-            setLocationError(`No events near "${detectedCity}"`)
-          }
+          const detectedCity = data.address?.city || data.address?.town || data.address?.village || ''
+          if (!detectedCity) { setLocationError('Could not determine your city'); return }
+          const matched = availableCities.find(c => c.toLowerCase() === detectedCity.toLowerCase())
+          if (matched) selectCity(matched)
+          else setLocationError(`No events near "${detectedCity}"`)
         } catch {
           setLocationError('Failed to detect location')
         } finally {
           setDetectingLocation(false)
         }
       },
-      () => {
-        setLocationError('Location access denied')
-        setDetectingLocation(false)
-      },
+      () => { setLocationError('Location access denied'); setDetectingLocation(false) },
       { timeout: 8000 }
     )
   }
@@ -120,26 +118,43 @@ export default function Navigation() {
     c.toLowerCase().includes(citySearch.toLowerCase())
   )
 
+  // ── Fetch notifications for logged-in user ────────────────────
+  const fetchNotifications = (token: string) => {
+    fetch(`${API_BASE}/users/notifications/`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setNotifications(data)
+          const dayAgo = Date.now() - 86400000
+          setUnreadCount(data.filter((n: Notification) =>
+            new Date(n.created_at).getTime() > dayAgo
+          ).length)
+        }
+      })
+      .catch(() => {})
+  }
+
   // ── Auth state ────────────────────────────────────────────────
   useEffect(() => {
     const updateNav = () => {
-      const token = localStorage.getItem('authToken')
+      const token    = localStorage.getItem('authToken')
       const userData = localStorage.getItem('user')
 
-      const isTokenExpired = (token: string) => {
+      const isTokenExpired = (t: string) => {
         try {
-          const payload = JSON.parse(atob(token.split('.')[1]))
+          const payload = JSON.parse(atob(t.split('.')[1]))
           return payload.exp * 1000 < Date.now()
-        } catch {
-          return true
-        }
+        } catch { return true }
       }
 
-      const validToken = token && 
-        token !== 'undefined' && 
-        token !== 'null' && 
+      const validToken =
+        token &&
+        token !== 'undefined' &&
+        token !== 'null' &&
         token.length > 10 &&
-        !isTokenExpired(token)  // ← reject expired tokens
+        !isTokenExpired(token)
 
       if (validToken && userData) {
         try {
@@ -147,13 +162,23 @@ export default function Navigation() {
           if (parsed && parsed.role) {
             setIsLoggedIn(true)
             setUser(parsed)
+            // Fetch notifications for non-admin users
+            if (parsed.role !== 'Admin') {
+              fetchNotifications(token as string)
+            }
           } else {
             setIsLoggedIn(false)
             setUser(null)
+            localStorage.removeItem('authToken')
+            localStorage.removeItem('refreshToken')
+            localStorage.removeItem('user')
           }
         } catch {
           setIsLoggedIn(false)
           setUser(null)
+          localStorage.removeItem('authToken')
+          localStorage.removeItem('refreshToken')
+          localStorage.removeItem('user')
         }
       } else {
         setIsLoggedIn(false)
@@ -176,18 +201,28 @@ export default function Navigation() {
 
   const handleLogout = () => {
     localStorage.removeItem('authToken')
+    localStorage.removeItem('refreshToken')
     localStorage.removeItem('user')
     setIsLoggedIn(false)
     setUser(null)
+    setNotifications([])
+    setUnreadCount(0)
     router.push('/login')
   }
 
   const isVenueOwner = user?.role === 'VENUE_OWNER'
-  const isCustomer = user?.role === 'Customer'
+  const isCustomer   = user?.role === 'Customer'
 
   const navLinkClass = theme === 'dark'
     ? 'text-gray-300 hover:text-white transition-colors'
     : 'text-gray-600 hover:text-gray-900 transition-colors'
+
+  const notifTypeColor: Record<string, string> = {
+    announcement: 'bg-blue-500/15 text-blue-400',
+    alert:        'bg-red-500/15 text-red-400',
+    maintenance:  'bg-yellow-500/15 text-yellow-400',
+    event:        'bg-emerald-500/15 text-emerald-400',
+  }
 
   return (
     <nav className={`sticky top-0 z-50 border-b transition-colors duration-300 ${
@@ -218,10 +253,7 @@ export default function Navigation() {
               >
                 <MapPin size={15} className="text-red-500" />
                 <span className="max-w-[100px] truncate">{selectedCity}</span>
-                <ChevronDown
-                  size={14}
-                  className={`transition-transform ${cityDropdownOpen ? 'rotate-180' : ''}`}
-                />
+                <ChevronDown size={14} className={`transition-transform ${cityDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
               <AnimatePresence>
@@ -232,9 +264,7 @@ export default function Navigation() {
                     exit={{ opacity: 0, y: -8, scale: 0.95 }}
                     transition={{ duration: 0.15 }}
                     className={`absolute top-full left-0 mt-2 w-72 rounded-xl border shadow-2xl z-50 overflow-hidden ${
-                      theme === 'dark'
-                        ? 'bg-gray-900 border-gray-700'
-                        : 'bg-white border-gray-200'
+                      theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
                     }`}
                   >
                     <div className={`px-4 py-3 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-100'}`}>
@@ -263,15 +293,10 @@ export default function Navigation() {
                         disabled={detectingLocation}
                         className="flex items-center gap-2 text-red-500 hover:text-red-400 text-sm font-medium transition w-full py-1"
                       >
-                        {detectingLocation
-                          ? <Loader2 size={14} className="animate-spin" />
-                          : <MapPin size={14} />
-                        }
+                        {detectingLocation ? <Loader2 size={14} className="animate-spin" /> : <MapPin size={14} />}
                         {detectingLocation ? 'Detecting location...' : 'Use my current location'}
                       </button>
-                      {locationError && (
-                        <p className="text-xs text-red-400 mt-1">{locationError}</p>
-                      )}
+                      {locationError && <p className="text-xs text-red-400 mt-1">{locationError}</p>}
                     </div>
 
                     <div className="max-h-56 overflow-y-auto">
@@ -280,15 +305,11 @@ export default function Navigation() {
                         className={`w-full text-left px-4 py-2.5 text-sm transition flex items-center justify-between ${
                           selectedCity === 'All Cities'
                             ? 'text-red-500 bg-red-500/10'
-                            : theme === 'dark'
-                              ? 'text-gray-300 hover:bg-gray-800'
-                              : 'text-gray-700 hover:bg-gray-50'
+                            : theme === 'dark' ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-50'
                         }`}
                       >
                         All Cities
-                        {selectedCity === 'All Cities' && (
-                          <span className="w-2 h-2 rounded-full bg-red-500" />
-                        )}
+                        {selectedCity === 'All Cities' && <span className="w-2 h-2 rounded-full bg-red-500" />}
                       </button>
 
                       {filteredCities.length === 0 ? (
@@ -301,15 +322,11 @@ export default function Navigation() {
                             className={`w-full text-left px-4 py-2.5 text-sm transition flex items-center justify-between ${
                               selectedCity === city
                                 ? 'text-red-500 bg-red-500/10'
-                                : theme === 'dark'
-                                  ? 'text-gray-300 hover:bg-gray-800'
-                                  : 'text-gray-700 hover:bg-gray-50'
+                                : theme === 'dark' ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-50'
                             }`}
                           >
                             {city}
-                            {selectedCity === city && (
-                              <span className="w-2 h-2 rounded-full bg-red-500" />
-                            )}
+                            {selectedCity === city && <span className="w-2 h-2 rounded-full bg-red-500" />}
                           </button>
                         ))
                       )}
@@ -320,22 +337,16 @@ export default function Navigation() {
             </div>
           )}
 
-          {/* ── Nav Links — mounted guard prevents localStorage flicker ── */}
+          {/* ── Nav Links ── */}
 
           {/* Not logged in */}
           {mounted && !isLoggedIn && (
             <>
               <Link href="/" className={navLinkClass}>Events</Link>
-              <Link
-                href="/login"
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold text-sm"
-              >
+              <Link href="/login" className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold text-sm">
                 Login
               </Link>
-              <Link
-                href="/register"
-                className="px-4 py-2 border border-red-600 text-red-500 rounded-lg hover:bg-red-600/10 transition-colors font-semibold text-sm"
-              >
+              <Link href="/register" className="px-4 py-2 border border-red-600 text-red-500 rounded-lg hover:bg-red-600/10 transition-colors font-semibold text-sm">
                 Register
               </Link>
             </>
@@ -347,12 +358,7 @@ export default function Navigation() {
               <Link href="/" className={navLinkClass}>Events</Link>
               <Link href="/bookings" className={navLinkClass}>My Bookings</Link>
               <Link href="/venue-dashboard/profile" className={navLinkClass}>Profile</Link>
-              <button
-                onClick={handleLogout}
-                className={`flex items-center gap-2 transition-colors text-sm ${
-                  theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-600 hover:text-red-500'
-                }`}
-              >
+              <button onClick={handleLogout} className={`flex items-center gap-2 transition-colors text-sm ${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-600 hover:text-red-500'}`}>
                 <LogOut size={18} /> Logout
               </button>
             </>
@@ -376,27 +382,19 @@ export default function Navigation() {
               <Link href="/venue-dashboard/profile" className={`flex items-center gap-1.5 ${navLinkClass}`}>
                 <User size={16} /> Profile
               </Link>
-              <button
-                onClick={handleLogout}
-                className={`flex items-center gap-2 transition-colors text-sm ${
-                  theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-600 hover:text-red-500'
-                }`}
-              >
+              <button onClick={handleLogout} className={`flex items-center gap-2 transition-colors text-sm ${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-600 hover:text-red-500'}`}>
                 <LogOut size={18} /> Logout
               </button>
             </>
           )}
 
-          {/* Wishlist — customers only */}
+          {/* ── Wishlist — customers only ── */}
           {mounted && isLoggedIn && isCustomer && (
             <Link href="/wishlist" className="relative">
-              <motion.div
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
+              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
                 className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors duration-300 ${
                   theme === 'dark' ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'
-                }`}
-              >
+                }`}>
                 <Heart size={18} className="text-red-500" />
                 {wishlist.length > 0 && (
                   <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white text-xs rounded-full flex items-center justify-center font-bold">
@@ -407,7 +405,88 @@ export default function Navigation() {
             </Link>
           )}
 
-          {/* Theme Toggle */}
+          {/* ── Notification Bell — customers & venue owners ── */}
+          {mounted && isLoggedIn && (isCustomer || isVenueOwner) && (
+            <div className="relative" ref={notifRef}>
+              <button
+                onClick={() => { setNotifOpen(!notifOpen); setUnreadCount(0) }}
+                className={`relative w-10 h-10 rounded-full flex items-center justify-center transition-colors duration-300 ${
+                  theme === 'dark' ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'
+                }`}
+              >
+                <Bell size={18} className={theme === 'dark' ? 'text-gray-300' : 'text-gray-600'} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              <AnimatePresence>
+                {notifOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className={`absolute top-full right-0 mt-2 w-80 rounded-xl border shadow-2xl z-50 overflow-hidden ${
+                      theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
+                    }`}
+                  >
+                    {/* Header */}
+                    <div className={`px-4 py-3 border-b flex items-center justify-between ${theme === 'dark' ? 'border-gray-700' : 'border-gray-100'}`}>
+                      <p className={`text-xs font-semibold uppercase tracking-wide ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Notifications
+                      </p>
+                      {notifications.length > 0 && (
+                        <span className={`text-xs ${theme === 'dark' ? 'text-gray-600' : 'text-gray-400'}`}>
+                          {notifications.length} total
+                        </span>
+                      )}
+                    </div>
+
+                    {/* List */}
+                    <div className="max-h-80 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="py-10 text-center">
+                          <Bell size={24} className="mx-auto mb-2 text-gray-600" />
+                          <p className="text-gray-500 text-sm">No notifications yet</p>
+                        </div>
+                      ) : (
+                        notifications.map(n => (
+                          <div
+                            key={n.id}
+                            className={`px-4 py-3 border-b last:border-0 transition-colors ${
+                              theme === 'dark'
+                                ? 'border-gray-800 hover:bg-gray-800/50'
+                                : 'border-gray-100 hover:bg-gray-50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${notifTypeColor[n.type] || 'bg-gray-500/15 text-gray-400'}`}>
+                                {n.type}
+                              </span>
+                              <span className="text-gray-600 text-[10px]">
+                                {new Date(n.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                              </span>
+                            </div>
+                            <p className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                              {n.title}
+                            </p>
+                            <p className={`text-xs mt-0.5 leading-relaxed ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                              {n.message}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
+          {/* ── Theme Toggle ── */}
           <motion.button
             onClick={toggleTheme}
             whileHover={{ scale: 1.1 }}
