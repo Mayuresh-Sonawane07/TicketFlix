@@ -37,7 +37,8 @@ export default function Login() {
   const handleLoginSuccess = (token: string, refresh: string, user: any) => {
     localStorage.setItem('authToken', token)
     localStorage.setItem('refreshToken', refresh)
-    localStorage.setItem('user', JSON.stringify(user))
+    const safeUser = { id: user.id, first_name: user.first_name, role: user.role }
+    localStorage.setItem('user', JSON.stringify(safeUser))
     window.dispatchEvent(new Event('authChange'))
     if (user.role === 'Admin') router.push('/admin-panel')
     else if (user.role === 'VENUE_OWNER') router.push('/venue-dashboard')
@@ -68,10 +69,8 @@ export default function Login() {
     setError(null)
     setIsGoogleLoading(true)
     try {
-      const res = await apiClient.post('/users/google-login/', {
-        token: response.credential,
-      })
-      handleLoginSuccess(res.data.token, res.data.refresh, res.data.user)
+      const res = await authAPI.googleLogin(response.credential)
+      handleLoginSuccess(res.token, res.refresh, res.user)
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Google login failed. Please try again.')
     } finally {
