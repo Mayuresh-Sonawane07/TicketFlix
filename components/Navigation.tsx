@@ -241,7 +241,7 @@ export default function Navigation() {
         <div className="flex items-center gap-4">
 
           {/* ── City Selector ── */}
-          {!isVenueOwner && (
+          {(isCustomer || !isLoggedIn) && (
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setCityDropdownOpen(!cityDropdownOpen)}
