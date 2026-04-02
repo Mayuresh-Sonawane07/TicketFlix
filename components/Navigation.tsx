@@ -16,7 +16,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://web-production
 
 interface UserData {
   id: number
-  email: string
+  first_name?: string
   role: string
 }
 

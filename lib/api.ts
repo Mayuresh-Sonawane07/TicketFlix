@@ -68,6 +68,25 @@ export interface User {
   role: string
   phone_number: string
   is_phone_verified: boolean
+  first_name?: string
+  last_name?: string
+  location?: string
+}
+
+// Only non-sensitive fields are stored in localStorage
+export interface SafeUser {
+  id: number
+  first_name?: string
+  role: string
+}
+
+/** Strip sensitive PII before storing in localStorage */
+export function sanitizeUser(user: User): SafeUser {
+  return {
+    id: user.id,
+    first_name: user.first_name,
+    role: user.role,
+  }
 }
 
 export interface Event {
@@ -202,21 +221,41 @@ export const authAPI = {
     role: 'Customer' | 'VENUE_OWNER'
   }) => apiClient.post("/users/register/", data),
 
-  verifyOTP: (data: {
+  verifyOTP: async (data: {
     email: string
     otp: string
-  }) => apiClient.post<{ token: string; refresh: string; user: User }>("/users/verify-otp/", data),
+  }): Promise<{ token: string; refresh: string; user: SafeUser }> => {
+    const response = await apiClient.post<{ token: string; refresh: string; user: User }>(
+      "/users/verify-otp/",
+      data
+    )
+    return {
+      ...response.data,
+      user: sanitizeUser(response.data.user),
+    }
+  },
 
-  login: async (email: string, password: string): Promise<{ token: string; refresh: string; user: User }> => {
+  login: async (email: string, password: string): Promise<{ token: string; refresh: string; user: SafeUser }> => {
     const response = await apiClient.post<{ token: string; refresh: string; user: User }>(
       "/users/login/",
       { email, password }
     )
-    return response.data
+    return {
+      ...response.data,
+      user: sanitizeUser(response.data.user),
+    }
   },
 
-  googleLogin: (token: string) =>
-    apiClient.post<{ token: string; refresh: string; user: User }>('/users/google-login/', { token }),
+  googleLogin: async (token: string): Promise<{ token: string; refresh: string; user: SafeUser }> => {
+    const response = await apiClient.post<{ token: string; refresh: string; user: User }>(
+      '/users/google-login/',
+      { token }
+    )
+    return {
+      ...response.data,
+      user: sanitizeUser(response.data.user),
+    }
+  },
 
   refreshToken: (refresh: string) =>
     apiClient.post<{ access: string }>('/users/token/refresh/', { refresh }),
@@ -249,8 +288,5 @@ export const paymentAPI = {
     razorpay_order_id: string
     razorpay_payment_id: string
     razorpay_signature: string
-    // show: number
-    // seats: number[]
-    // total_amount: number
   }) => apiClient.post('/payments/verify/', data),
 }
