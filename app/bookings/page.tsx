@@ -216,7 +216,7 @@ function BookingsContent() {
       doc.setTextColor(80, 80, 100)
       doc.text('This is an official TicketFlix booking confirmation. Please carry this ticket to the venue.', W / 2, pageH - 12, { align: 'center' })
       doc.setTextColor(220, 38, 38)
-      doc.text('www.ticketflix.com', W / 2, pageH - 5, { align: 'center' })
+      doc.text('www.ticketflix-ten.vercel.app', W / 2, pageH - 5, { align: 'center' })
 
       doc.save(`TicketFlix-Booking-${booking.id}.pdf`)
     } catch (err) {
