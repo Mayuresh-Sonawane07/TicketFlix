@@ -809,7 +809,7 @@ function Empty({ text }: { text: string }) {
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard',    label: 'Dashboard',    icon: <LayoutDashboard size={16}/> },
   { id: 'venue-owners', label: 'Venue Owners', icon: <UserCheck size={16}/> },
-  { id: 'users',        label: 'Users',        icon: <Users size={16}/> },
+  { id: 'users',        label: 'Customers',    icon: <Users size={16}/> },
   { id: 'events',       label: 'Events',       icon: <CalendarDays size={16}/> },
   { id: 'shows',        label: 'Shows',        icon: <Play size={16}/> },
   { id: 'bookings',     label: 'Bookings',     icon: <Ticket size={16}/> },
