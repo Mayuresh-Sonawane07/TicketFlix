@@ -18,7 +18,11 @@ function CheckoutContent() {
   const showTime = searchParams.get('time') || ''
   const showVenue = searchParams.get('venue') || ''
 
-  const [orderData, setOrderData] = useState<any>(null)
+  interface OrderData {
+    key_id: string; order_id: string; amount: number; currency: string;
+    num_seats: number; ticket_amount: number; convenience_fee: number;
+  }
+  const [orderData, setOrderData] = useState<OrderData | null>(null)
   const [loading, setLoading] = useState(true)
   const [paying, setPaying] = useState(false)
   const [error, setError] = useState('')
@@ -62,7 +66,7 @@ function CheckoutContent() {
       name: 'TicketFlix',
       description: showTitle,
       order_id: orderData.order_id,
-      handler: async (response: any) => {
+      handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
         try {
           await paymentAPI.verify({
             razorpay_order_id: response.razorpay_order_id,
@@ -78,7 +82,7 @@ function CheckoutContent() {
       modal: { ondismiss: () => setPaying(false) },
     }
     const rzp = new window.Razorpay(options)
-    rzp.on('payment.failed', (response: any) => {
+    rzp.on('payment.failed', (response: { error: { description: string } }) => {
       setError(response.error.description)
       setPaying(false)
     })

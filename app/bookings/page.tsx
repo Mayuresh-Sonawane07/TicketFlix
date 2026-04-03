@@ -36,8 +36,7 @@ function BookingsContent() {
       const endpoint = user?.role === 'VENUE_OWNER' ? '/bookings/venue_analytics/' : '/bookings/'
       const res = await apiClient.get(endpoint)
       const data = res.data
-      setBookings(Array.isArray(data) ? data : (data as any).results ?? [])
-    } catch {
+      setBookings(Array.isArray(data) ? data : (data as { results?: Booking[] }).results ?? [])    } catch {
       setError('Failed to load bookings')
     } finally {
       setLoading(false)
@@ -50,14 +49,19 @@ function BookingsContent() {
     try {
       await bookingAPI.cancel(id)
       setBookings(bookings.map(b => b.id === id ? { ...b, status: 'Cancelled' } : b))
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Cannot cancel this booking')
+    } catch (err: unknown) {
+      alert((err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Cannot cancel this booking')
     } finally {
       setCancelling(null)
     }
   }
 
-  const handleDownloadTicket = async (booking: any) => {
+  interface BookingDetail extends Booking {
+    show_details?: { event?: { title?: string; event_type?: string }; show_time?: string; theater_name?: string }
+    qr_token?: string
+    user_email?: string
+  }
+  const handleDownloadTicket = async (booking: BookingDetail) => {
     setGeneratingPDF(booking.id)
     try {
       const { jsPDF } = await import('jspdf')

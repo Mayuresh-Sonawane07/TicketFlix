@@ -73,8 +73,8 @@ export default function RegisterPage() {
       })
       setStep('otp')
       startResendCooldown()
-    } catch (err: any) {
-      const data = err.response?.data
+    } catch (err: unknown) {
+      const data = (err as { response?: { data?: Record<string, string[]> } })?.response?.data
       if (data) {
         const messages = Object.values(data).flat()
         setError(messages.join(' '))
@@ -104,8 +104,8 @@ export default function RegisterPage() {
       await profileAPI.resendOTP(form.email)
       setSuccess('OTP resent successfully! Check your email.')
       startResendCooldown()
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to resend OTP.')
+    } catch (err: unknown) {
+      setError((err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to resend OTP.')
     } finally {
       setResending(false)
     }
@@ -119,27 +119,29 @@ export default function RegisterPage() {
     try {
       // Verify OTP — now returns tokens directly
       const verifyRes = await authAPI.verifyOTP({ email: form.email, otp })
-      const { token, refresh, user } = verifyRes.data as any
+      const { token, refresh, user } = verifyRes as { token: string; refresh: string; user: { id: number; first_name?: string; role: string } }
 
       // If verifyOTP returns tokens directly, use them
       if (token && refresh && user) {
         localStorage.setItem('authToken', token)
         localStorage.setItem('refreshToken', refresh)
-        localStorage.setItem('user', JSON.stringify(user))
+        const safeUser = { id: user.id, first_name: user.first_name, role: user.role }
+        localStorage.setItem('user', JSON.stringify(safeUser))
         window.dispatchEvent(new Event('authChange'))
         router.push(form.role === 'VENUE_OWNER' ? '/venue-dashboard' : '/')
         return
       }
-
+      
       // Fallback: login separately to get tokens
       const { token: loginToken, refresh: loginRefresh, user: loginUser } = await authAPI.login(form.email, form.password)
       localStorage.setItem('authToken', loginToken)
       localStorage.setItem('refreshToken', loginRefresh)
-      localStorage.setItem('user', JSON.stringify(loginUser))
+      const safeLoginUser = { id: loginUser.id, first_name: loginUser.first_name, role: loginUser.role }
+      localStorage.setItem('user', JSON.stringify(safeLoginUser))
       window.dispatchEvent(new Event('authChange'))
       router.push(form.role === 'VENUE_OWNER' ? '/venue-dashboard' : '/')
-    } catch (err: any) {
-      const data = err.response?.data
+    } catch (err: unknown) {
+      const data = (err as { response?: { data?: { non_field_errors?: string[]; otp?: string[] } } })?.response?.data
       setError(
         data?.non_field_errors?.[0] ||
         data?.otp?.[0] ||
