@@ -65,7 +65,7 @@ function StatCard({ label, value, icon, accent = 'red', sub, onClick }: {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       onClick={onClick}
-      className={`border rounded-xl p-5 ${accents[accent]}${onClick ? 'cursor-pointer hover:brightness-125 transition-all' : ''}`}
+      className={`border rounded-xl p-5 ${accents[accent]} ${onClick ? 'cursor-pointer hover:brightness-125 transition-all' : ''}`}
     >
       <div className="flex items-start justify-between mb-3">
         <span className={`${iconAccents[accent]}`}>{icon}</span>
@@ -215,7 +215,7 @@ function VenueOwnersTab() {
   const [owners, setOwners] = useState<any[]>([])
   const [filter, setFilter] = useState<'pending' | 'approved' | 'banned' | 'all'>('pending')
   const [loading, setLoading] = useState(true)
-  const [confirm, setConfirm] = useState<{ msg: string; action: () => void; input?: string } | null>(null)
+  const [confirm, setConfirm] = useState<{ msg: string; action?: () => void; actionWithReason?: (v?: string) => void; input?: string } | null>(null)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -236,7 +236,10 @@ function VenueOwnersTab() {
 
   return (
     <div>
-      <AnimatePresence>{confirm && <ConfirmModal message={confirm.msg} onConfirm={(v) => confirm.action()} onCancel={() => setConfirm(null)} extraInput={confirm.input} />}</AnimatePresence>
+      <AnimatePresence>{confirm && <ConfirmModal message={confirm.msg} onConfirm={(v) => {
+                          if (confirm.actionWithReason) confirm.actionWithReason(v)
+                          else confirm.action?.()
+                        }} onCancel={() => setConfirm(null)} extraInput={confirm.input} />}</AnimatePresence>
 
       {/* Filter tabs */}
       <div className="flex gap-2 mb-6">
@@ -276,7 +279,7 @@ function VenueOwnersTab() {
                 )}
                 {!o.is_banned && (
                   <ActionBtn label="Ban" icon={<Ban size={12}/>} variant="danger"
-                    onClick={() => setConfirm({ msg: `Ban ${o.name}? Enter reason:`, input: 'Reason for ban', action: () => act(o.id, 'ban') })} />
+                    onClick={() => setConfirm({ msg: `Ban ${o.name}? Enter reason:`, input: 'Reason for ban', actionWithReason: (v) => act(o.id, 'ban', v) })} />
                 )}
                 {o.is_banned && (
                   <ActionBtn label="Unban" icon={<UserCheck size={12}/>} variant="success"
@@ -297,12 +300,12 @@ function UsersTab() {
   const [users, setUsers]   = useState<any[]>([])
   const [filter, setFilter] = useState<'all' | 'Customer' | 'VENUE_OWNER'>('all')
   const [loading, setLoading] = useState(true)
-  const [confirm, setConfirm] = useState<{ msg: string; action: () => void; input?: string } | null>(null)
+  const [confirm, setConfirm] = useState<{ msg: string; action?: () => void; actionWithReason?: (v?: string) => void; input?: string } | null>(null)
 
   const load = useCallback(() => {
     setLoading(true)
     const q = filter !== 'all' ? `?role=${filter}` : ''
-    apiClient.get(api(`/users/${q}`)).then(r => setUsers(r.data)).finally(() => setLoading(false))
+    apiClient.get(api(`/users/${q}`)).then(r => setUsers(r.data.results ?? r.data)).finally(() => setLoading(false))
   }, [filter])
 
   useEffect(() => { load() }, [load])
@@ -314,7 +317,10 @@ function UsersTab() {
 
   return (
     <div>
-      <AnimatePresence>{confirm && <ConfirmModal message={confirm.msg} onConfirm={() => confirm.action()} onCancel={() => setConfirm(null)} extraInput={confirm.input} />}</AnimatePresence>
+      <AnimatePresence>{confirm && <ConfirmModal message={confirm.msg} onConfirm={(v) => {
+                                      if (confirm.actionWithReason) confirm.actionWithReason(v)
+                                      else confirm.action?.()
+                                    }} onCancel={() => setConfirm(null)} extraInput={confirm.input} />}</AnimatePresence>
 
       <div className="flex gap-2 mb-6">
         {(['all', 'Customer', 'VENUE_OWNER'] as const).map(f => (
@@ -342,7 +348,7 @@ function UsersTab() {
               <div className="flex gap-2 shrink-0">
                 {!u.is_banned
                   ? <ActionBtn label="Ban" icon={<Ban size={12}/>} variant="danger"
-                      onClick={() => setConfirm({ msg: `Ban ${u.name}?`, input: 'Reason', action: () => act(u.id, 'ban') })} />
+                      onClick={() => setConfirm({ msg: `Ban ${u.name}?`, input: 'Reason', actionWithReason: (v) => act(u.id, 'ban', v) })} />
                   : <ActionBtn label="Unban" icon={<UserCheck size={12}/>} variant="success"
                       onClick={() => setConfirm({ msg: `Unban ${u.name}?`, action: () => act(u.id, 'unban') })} />
                 }
@@ -363,7 +369,7 @@ function EventsTab() {
   const [events, setEvents]  = useState<any[]>([])
   const [filter, setFilter]  = useState<'all' | 'pending' | 'approved' | 'flagged' | 'removed'>('pending')
   const [loading, setLoading] = useState(true)
-  const [confirm, setConfirm] = useState<{ msg: string; action: () => void; input?: string } | null>(null)
+  const [confirm, setConfirm] = useState<{ msg: string; action?: () => void; actionWithReason?: (v?: string) => void; input?: string } | null>(null)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -384,7 +390,10 @@ function EventsTab() {
 
   return (
     <div>
-      <AnimatePresence>{confirm && <ConfirmModal message={confirm.msg} onConfirm={() => confirm.action()} onCancel={() => setConfirm(null)} extraInput={confirm.input} />}</AnimatePresence>
+      <AnimatePresence>{confirm && <ConfirmModal message={confirm.msg} onConfirm={(v) => {
+                                                                                            if (confirm.actionWithReason) confirm.actionWithReason(v)
+                                                                                            else confirm.action?.()
+                                                                                          }} onCancel={() => setConfirm(null)} extraInput={confirm.input} />}</AnimatePresence>
 
       <div className="flex gap-2 mb-6 flex-wrap">
         {(['pending', 'approved', 'flagged', 'removed', 'all'] as const).map(f => (
@@ -420,11 +429,11 @@ function EventsTab() {
                 )}
                 {e.status !== 'flagged' && (
                   <ActionBtn label="Flag" icon={<Flag size={12}/>} variant="warn"
-                    onClick={() => setConfirm({ msg: `Flag "${e.title}"? Add a note:`, input: 'Reason for flagging', action: () => act(e.id, 'flag') })} />
+                    onClick={() => setConfirm({ msg: `Flag "${e.title}"? Add a note:`, input: 'Reason for flagging', actionWithReason: (v) => act(e.id, 'flag', v) })} />
                 )}
                 {e.status !== 'removed' && (
                   <ActionBtn label="Remove" icon={<XCircle size={12}/>} variant="danger"
-                    onClick={() => setConfirm({ msg: `Remove "${e.title}" from platform?`, input: 'Reason', action: () => act(e.id, 'remove') })} />
+                    onClick={() => setConfirm({ msg: `Remove "${e.title}" from platform?`, input: 'Reason', actionWithReason: (v) => act(e.id, 'remove', v) })} />
                 )}
                 <ActionBtn label="Delete" icon={<Trash2 size={12}/>} variant="danger"
                   onClick={() => setConfirm({ msg: `Permanently delete "${e.title}"? Cannot be undone.`, action: () => act(e.id, 'delete') })} />
