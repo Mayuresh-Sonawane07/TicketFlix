@@ -210,7 +210,7 @@ export default function DownloadTicket({ booking }: { booking: any }) {
         W / 2, ftY + 3, { align: 'center' }
       )
       doc.setTextColor(220, 38, 38); doc.setFontSize(8); doc.setFont('helvetica', 'bold')
-      doc.text('www.ticketflix-ten.vercel.app', W / 2, ftY + 10, { align: 'center' })
+      doc.text('https://ticketflix-ten.vercel.app', W / 2, ftY + 10, { align: 'center' })
 
       doc.save(`TicketFlix-Booking-${ticket.bookingId}.pdf`)
     } catch (err) {
