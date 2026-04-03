@@ -298,15 +298,13 @@ function VenueOwnersTab() {
 
 function UsersTab() {
   const [users, setUsers]   = useState<any[]>([])
-  const [filter, setFilter] = useState<'all' | 'Customer' | 'VENUE_OWNER'>('all')
   const [loading, setLoading] = useState(true)
   const [confirm, setConfirm] = useState<{ msg: string; action?: () => void; actionWithReason?: (v?: string) => void; input?: string } | null>(null)
 
   const load = useCallback(() => {
     setLoading(true)
-    const q = filter !== 'all' ? `?role=${filter}` : ''
-    apiClient.get(api(`/users/${q}`)).then(r => setUsers(r.data.results ?? r.data)).finally(() => setLoading(false))
-  }, [filter])
+    apiClient.get(api('/users/')).then(r => setUsers(r.data.results ?? r.data)).finally(() => setLoading(false))
+  }, [])
 
   useEffect(() => { load() }, [load])
 
@@ -321,15 +319,6 @@ function UsersTab() {
                                       if (confirm.actionWithReason) confirm.actionWithReason(v)
                                       else confirm.action?.()
                                     }} onCancel={() => setConfirm(null)} extraInput={confirm.input} />}</AnimatePresence>
-
-      <div className="flex gap-2 mb-6">
-        {(['all', 'Customer', 'VENUE_OWNER'] as const).map(f => (
-          <button key={f} onClick={() => setFilter(f)}
-            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition ${filter === f ? 'bg-red-600 text-white' : 'bg-gray-900 border border-gray-800 text-gray-400 hover:border-gray-600'}`}>
-            {f === 'VENUE_OWNER' ? 'Venue Owners' : f === 'Customer' ? 'Customers' : 'All'}
-          </button>
-        ))}
-      </div>
 
       {loading ? <Loader /> : users.length === 0 ? <Empty text="No users" /> : (
         <div className="space-y-2">
@@ -897,7 +886,7 @@ export default function AdminPanelPage() {
             <p className="text-gray-600 text-sm mt-0.5">
               {tab === 'dashboard'    && 'Platform overview and key metrics'}
               {tab === 'venue-owners' && 'Approve, reject or ban venue owner accounts'}
-              {tab === 'users'        && 'Manage all platform users'}
+              {tab === 'users'        && 'Manage all customers'}
               {tab === 'events'       && 'Moderate and approve events before publishing'}
               {tab === 'shows'        && 'Cancel or modify show timings'}
               {tab === 'bookings'     && 'View and manage all bookings'}
