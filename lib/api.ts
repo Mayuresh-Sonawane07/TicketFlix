@@ -203,7 +203,7 @@ export const authAPI = {
     phone_number: string
     password: string
     role: 'Customer' | 'VENUE_OWNER'
-  }) => apiClient.post("register/", data),
+  }) => apiClient.post("/register/", data),
 
   verifyOTP: async (data: {
     email: string
