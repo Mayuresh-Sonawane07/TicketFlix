@@ -5,7 +5,8 @@ const DJANGO = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://web-production-c
 export async function POST(req: NextRequest) {
   const refresh = req.cookies.get('refreshToken')?.value
   if (refresh) {
-    await fetch(`${DJANGO}/users/logout/`, {
+    // Fire-and-forget — always clear cookies even if backend is down
+    fetch(`${DJANGO}/users/logout/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh }),
