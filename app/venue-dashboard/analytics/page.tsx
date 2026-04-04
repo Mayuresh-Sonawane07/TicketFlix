@@ -20,13 +20,14 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const res = await fetch('/api/auth/me')
-    if (!res.ok) { router.push('/login'); return }
-    const user = await res.json()
-    if (user.role !== 'VENUE_OWNER') { router.push('/'); return }
-    fetchData()
+    ;(async () => {
+      const res = await fetch('/api/auth/me')
+      if (!res.ok) { router.push('/login'); return }
+      const user = await res.json()
+      if (user.role !== 'VENUE_OWNER') { router.push('/'); return }
+      fetchData()
+    })()
   }, [])
-
   const fetchData = async () => {
     try {
       const [eventsRes, bookingsRes] = await Promise.all([

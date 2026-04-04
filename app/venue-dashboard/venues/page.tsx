@@ -14,11 +14,13 @@ export default function MyVenuesPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
   useEffect(() => {
-    const res = await fetch('/api/auth/me')
-    if (!res.ok) { router.push('/login'); return }
-    const user = await res.json()
-    if (user.role !== 'VENUE_OWNER') { router.push('/'); return }
-    fetchVenues()
+    ;(async () => {
+      const res = await fetch('/api/auth/me')
+      if (!res.ok) { router.push('/login'); return }
+      const user = await res.json()
+      if (user.role !== 'VENUE_OWNER') { router.push('/'); return }
+      fetchVenues()
+    })()
   }, [])
 
   const fetchVenues = async () => {

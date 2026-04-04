@@ -48,12 +48,14 @@ export default function MyEventsPage() {
   const [cancellingShow, setCancellingShow] = useState<number | null>(null)
 
   useEffect(() => {
-    const res = await fetch('/api/auth/me')
-    if (!res.ok) { router.push('/login'); return }
-    const user = await res.json()
-    if (user.role !== 'VENUE_OWNER') { router.push('/'); return }
-    fetchEvents()
-    fetchVenues()
+    ;(async () => {
+      const res = await fetch('/api/auth/me')
+      if (!res.ok) { router.push('/login'); return }
+      const user = await res.json()
+      if (user.role !== 'VENUE_OWNER') { router.push('/'); return }
+      fetchEvents()
+      fetchVenues()
+    })()
   }, [])
 
   const fetchEvents = async () => {

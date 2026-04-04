@@ -15,11 +15,13 @@ export default function VenueBookingsPage() {
   const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    const res = await fetch('/api/auth/me')
-    if (!res.ok) { router.push('/login'); return }
-    const user = await res.json()
-    if (user.role !== 'VENUE_OWNER') { router.push('/'); return }
-    fetchBookings()
+    ;(async () => {
+      const res = await fetch('/api/auth/me')
+      if (!res.ok) { router.push('/login'); return }
+      const user = await res.json()
+      if (user.role !== 'VENUE_OWNER') { router.push('/'); return }
+      fetchBookings()
+    })()
   }, [])
 
   const fetchBookings = async () => {
