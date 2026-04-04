@@ -34,10 +34,9 @@ export default function Navigation() {
   const router = useRouter()
   const { theme, toggleTheme } = useTheme()
   const { wishlist } = useWishlist()
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [user, setUser]             = useState<UserData | null>(null)
-  const [mounted, setMounted]       = useState(false)
-  const [authLoading, setAuthLoading] = useState(true) // ✅ NEW: prevents flash
+
+  // ✅ Single state: 'loading' | null (not logged in) | UserData (logged in)
+  const [authState, setAuthState] = useState<UserData | null | 'loading'>('loading')
 
   const [selectedCity, setSelectedCity]         = useState('All Cities')
   const [availableCities, setAvailableCities]   = useState<string[]>([])
@@ -61,9 +60,7 @@ export default function Navigation() {
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setCityDropdownOpen(false)
-        setCitySearch('')
-        setLocationError('')
+        setCityDropdownOpen(false); setCitySearch(''); setLocationError('')
       }
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
         setNotifOpen(false)
@@ -72,44 +69,6 @@ export default function Navigation() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
-
-  const detectLocation = () => {
-    if (!navigator.geolocation) { setLocationError('Geolocation not supported'); return }
-    setDetectingLocation(true)
-    setLocationError('')
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const { latitude, longitude } = position.coords
-          const res  = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`)
-          const data = await res.json()
-          const detectedCity = data.address?.city || data.address?.town || data.address?.village || ''
-          if (!detectedCity) { setLocationError('Could not determine your city'); return }
-          const matched = availableCities.find(c => c.toLowerCase() === detectedCity.toLowerCase())
-          if (matched) selectCity(matched)
-          else setLocationError(`No events near "${detectedCity}"`)
-        } catch {
-          setLocationError('Failed to detect location')
-        } finally {
-          setDetectingLocation(false)
-        }
-      },
-      () => { setLocationError('Location access denied'); setDetectingLocation(false) },
-      { timeout: 8000 }
-    )
-  }
-
-  const selectCity = (city: string) => {
-    setSelectedCity(city)
-    dispatchCityChange(city)
-    setCityDropdownOpen(false)
-    setCitySearch('')
-    setLocationError('')
-  }
-
-  const filteredCities = availableCities.filter(c =>
-    c.toLowerCase().includes(citySearch.toLowerCase())
-  )
 
   const fetchNotifications = useCallback(() => {
     apiClient.get<Notification[]>('/users/notifications/')
@@ -124,50 +83,73 @@ export default function Navigation() {
       .catch(() => {})
   }, [])
 
-  useEffect(() => {
-    setMounted(true)
-
-    const updateNav = async () => {
-      setAuthLoading(true) // ✅ start loading before fetch
-      try {
-        const res = await fetch('/api/auth/me')
-        if (!res.ok) {
-          setIsLoggedIn(false)
-          setUser(null)
-          return
-        }
-        const parsed = await res.json()
-        if (parsed?.role) {
-          setIsLoggedIn(true)
-          setUser(parsed)
-          if (parsed.role !== 'Admin') fetchNotifications()
-        } else {
-          setIsLoggedIn(false)
-          setUser(null)
-        }
-      } catch {
-        setIsLoggedIn(false)
-        setUser(null)
-      } finally {
-        setAuthLoading(false) // ✅ done loading — now render nav items
+  const checkAuth = useCallback(async () => {
+    // ✅ Don't reset to 'loading' on re-checks (e.g. authChange events)
+    // Only the initial call starts in 'loading' state (set above)
+    try {
+      const res = await fetch('/api/auth/me')
+      if (!res.ok) { setAuthState(null); return }
+      const parsed = await res.json()
+      if (parsed?.role) {
+        setAuthState(parsed)
+        if (parsed.role !== 'Admin') fetchNotifications()
+      } else {
+        setAuthState(null)
       }
+    } catch {
+      setAuthState(null)
     }
-
-    updateNav()
-    window.addEventListener('authChange', updateNav)
-    return () => window.removeEventListener('authChange', updateNav)
   }, [fetchNotifications])
+
+  useEffect(() => {
+    checkAuth()
+    window.addEventListener('authChange', checkAuth)
+    return () => window.removeEventListener('authChange', checkAuth)
+  }, [checkAuth])
+
+  const detectLocation = () => {
+    if (!navigator.geolocation) { setLocationError('Geolocation not supported'); return }
+    setDetectingLocation(true); setLocationError('')
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords
+          const res  = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`)
+          const data = await res.json()
+          const detectedCity = data.address?.city || data.address?.town || data.address?.village || ''
+          if (!detectedCity) { setLocationError('Could not determine your city'); return }
+          const matched = availableCities.find(c => c.toLowerCase() === detectedCity.toLowerCase())
+          if (matched) selectCity(matched)
+          else setLocationError(`No events near "${detectedCity}"`)
+        } catch { setLocationError('Failed to detect location') }
+        finally { setDetectingLocation(false) }
+      },
+      () => { setLocationError('Location access denied'); setDetectingLocation(false) },
+      { timeout: 8000 }
+    )
+  }
+
+  const selectCity = (city: string) => {
+    setSelectedCity(city); dispatchCityChange(city)
+    setCityDropdownOpen(false); setCitySearch(''); setLocationError('')
+  }
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
-    setIsLoggedIn(false)
-    setUser(null)
-    setNotifications([])
-    setUnreadCount(0)
+    setAuthState(null)
+    setNotifications([]); setUnreadCount(0)
     router.push('/login')
     window.dispatchEvent(new Event('authChange'))
   }
 
+  const filteredCities = availableCities.filter(c =>
+    c.toLowerCase().includes(citySearch.toLowerCase())
+  )
+
+  // ✅ All derived from one state — no boolean drift
+  const isLoading    = authState === 'loading'
+  const isLoggedIn   = authState !== null && authState !== 'loading'
+  const user         = isLoggedIn ? (authState as UserData) : null
   const isVenueOwner = user?.role === 'VENUE_OWNER'
   const isCustomer   = user?.role === 'Customer'
 
@@ -182,18 +164,13 @@ export default function Navigation() {
     event:        'bg-emerald-500/15 text-emerald-400',
   }
 
-  // ✅ Render a stable skeleton while auth is resolving — no flash
-  const showNav = mounted && !authLoading
-
   return (
     <nav className={`sticky top-0 z-50 border-b transition-colors duration-300 ${
-      theme === 'dark'
-        ? 'bg-gray-950 border-red-600/20'
-        : 'bg-white border-gray-200 shadow-sm'
+      theme === 'dark' ? 'bg-gray-950 border-red-600/20' : 'bg-white border-gray-200 shadow-sm'
     }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
 
-        {/* Logo */}
+        {/* Logo — always visible */}
         <Link href="/" className="flex items-center gap-2 text-2xl font-bold text-red-600">
           <Film size={28} />
           <span>TicketFlix</span>
@@ -201,8 +178,8 @@ export default function Navigation() {
 
         <div className="flex items-center gap-4">
 
-          {/* ── City Selector ── */}
-          {showNav && (isCustomer || !isLoggedIn) && (
+          {/* City Selector */}
+          {!isLoading && (isCustomer || !isLoggedIn) && (
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setCityDropdownOpen(!cityDropdownOpen)}
@@ -272,7 +249,6 @@ export default function Navigation() {
                         All Cities
                         {selectedCity === 'All Cities' && <span className="w-2 h-2 rounded-full bg-red-500" />}
                       </button>
-
                       {filteredCities.length === 0 ? (
                         <p className="text-center text-gray-500 text-sm py-4">No cities found</p>
                       ) : (
@@ -298,32 +274,26 @@ export default function Navigation() {
             </div>
           )}
 
-          {/* ── Nav Links ── */}
-
-          {/* Loading skeleton — prevents layout shift while auth resolves */}
-          {mounted && authLoading && (
+          {/* Loading skeleton */}
+          {isLoading && (
             <div className="flex items-center gap-3">
-              <div className={`h-4 w-16 rounded animate-pulse ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-200'}`} />
-              <div className={`h-8 w-16 rounded-lg animate-pulse ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-200'}`} />
-              <div className={`h-8 w-20 rounded-lg animate-pulse ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-200'}`} />
+              {[64, 56, 72].map((w, i) => (
+                <div key={i} style={{ width: w }} className={`h-8 rounded-lg animate-pulse ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-200'}`} />
+              ))}
             </div>
           )}
 
           {/* Not logged in */}
-          {showNav && !isLoggedIn && (
+          {!isLoading && !isLoggedIn && (
             <>
               <Link href="/" className={navLinkClass}>Events</Link>
-              <Link href="/login" className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold text-sm">
-                Login
-              </Link>
-              <Link href="/register" className="px-4 py-2 border border-red-600 text-red-500 rounded-lg hover:bg-red-600/10 transition-colors font-semibold text-sm">
-                Register
-              </Link>
+              <Link href="/login" className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold text-sm">Login</Link>
+              <Link href="/register" className="px-4 py-2 border border-red-600 text-red-500 rounded-lg hover:bg-red-600/10 transition-colors font-semibold text-sm">Register</Link>
             </>
           )}
 
           {/* Customer */}
-          {showNav && isLoggedIn && isCustomer && (
+          {!isLoading && isLoggedIn && isCustomer && (
             <>
               <Link href="/" className={navLinkClass}>Events</Link>
               <Link href="/bookings" className={navLinkClass}>My Bookings</Link>
@@ -335,31 +305,21 @@ export default function Navigation() {
           )}
 
           {/* Venue Owner */}
-          {showNav && isLoggedIn && isVenueOwner && (
+          {!isLoading && isLoggedIn && isVenueOwner && (
             <>
-              <Link href="/venue-dashboard" className={`flex items-center gap-1.5 ${navLinkClass}`}>
-                <LayoutDashboard size={16} /> Dashboard
-              </Link>
-              <Link href="/venue-dashboard/events" className={`flex items-center gap-1.5 ${navLinkClass}`}>
-                <List size={16} /> My Events
-              </Link>
-              <Link href="/venue-dashboard/events/create" className={`flex items-center gap-1.5 ${navLinkClass}`}>
-                <CalendarPlus size={16} /> Create Event
-              </Link>
-              <Link href="/venue-dashboard/venues" className={`flex items-center gap-1.5 ${navLinkClass}`}>
-                <MapPin size={16} /> My Venues
-              </Link>
-              <Link href="/venue-dashboard/profile" className={`flex items-center gap-1.5 ${navLinkClass}`}>
-                <User size={16} /> Profile
-              </Link>
+              <Link href="/venue-dashboard" className={`flex items-center gap-1.5 ${navLinkClass}`}><LayoutDashboard size={16} /> Dashboard</Link>
+              <Link href="/venue-dashboard/events" className={`flex items-center gap-1.5 ${navLinkClass}`}><List size={16} /> My Events</Link>
+              <Link href="/venue-dashboard/events/create" className={`flex items-center gap-1.5 ${navLinkClass}`}><CalendarPlus size={16} /> Create Event</Link>
+              <Link href="/venue-dashboard/venues" className={`flex items-center gap-1.5 ${navLinkClass}`}><MapPin size={16} /> My Venues</Link>
+              <Link href="/venue-dashboard/profile" className={`flex items-center gap-1.5 ${navLinkClass}`}><User size={16} /> Profile</Link>
               <button onClick={handleLogout} className={`flex items-center gap-2 transition-colors text-sm ${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-600 hover:text-red-500'}`}>
                 <LogOut size={18} /> Logout
               </button>
             </>
           )}
 
-          {/* ── Wishlist — customers only ── */}
-          {showNav && isLoggedIn && isCustomer && (
+          {/* Wishlist */}
+          {!isLoading && isLoggedIn && isCustomer && (
             <Link href="/wishlist" className="relative">
               <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
                 className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors duration-300 ${
@@ -375,8 +335,8 @@ export default function Navigation() {
             </Link>
           )}
 
-          {/* ── Notification Bell — customers & venue owners ── */}
-          {showNav && isLoggedIn && (isCustomer || isVenueOwner) && (
+          {/* Notification Bell */}
+          {!isLoading && isLoggedIn && (isCustomer || isVenueOwner) && (
             <div className="relative" ref={notifRef}>
               <button
                 onClick={() => { setNotifOpen(!notifOpen); setUnreadCount(0) }}
@@ -391,7 +351,6 @@ export default function Navigation() {
                   </span>
                 )}
               </button>
-
               <AnimatePresence>
                 {notifOpen && (
                   <motion.div
@@ -404,16 +363,11 @@ export default function Navigation() {
                     }`}
                   >
                     <div className={`px-4 py-3 border-b flex items-center justify-between ${theme === 'dark' ? 'border-gray-700' : 'border-gray-100'}`}>
-                      <p className={`text-xs font-semibold uppercase tracking-wide ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                        Notifications
-                      </p>
+                      <p className={`text-xs font-semibold uppercase tracking-wide ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Notifications</p>
                       {notifications.length > 0 && (
-                        <span className={`text-xs ${theme === 'dark' ? 'text-gray-600' : 'text-gray-400'}`}>
-                          {notifications.length} total
-                        </span>
+                        <span className={`text-xs ${theme === 'dark' ? 'text-gray-600' : 'text-gray-400'}`}>{notifications.length} total</span>
                       )}
                     </div>
-
                     <div className="max-h-80 overflow-y-auto">
                       {notifications.length === 0 ? (
                         <div className="py-10 text-center">
@@ -422,28 +376,15 @@ export default function Navigation() {
                         </div>
                       ) : (
                         notifications.map(n => (
-                          <div
-                            key={n.id}
-                            className={`px-4 py-3 border-b last:border-0 transition-colors ${
-                              theme === 'dark'
-                                ? 'border-gray-800 hover:bg-gray-800/50'
-                                : 'border-gray-100 hover:bg-gray-50'
-                            }`}
-                          >
+                          <div key={n.id} className={`px-4 py-3 border-b last:border-0 transition-colors ${
+                            theme === 'dark' ? 'border-gray-800 hover:bg-gray-800/50' : 'border-gray-100 hover:bg-gray-50'
+                          }`}>
                             <div className="flex items-center gap-2 mb-1">
-                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${notifTypeColor[n.type] || 'bg-gray-500/15 text-gray-400'}`}>
-                                {n.type}
-                              </span>
-                              <span className="text-gray-600 text-[10px]">
-                                {new Date(n.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
-                              </span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${notifTypeColor[n.type] || 'bg-gray-500/15 text-gray-400'}`}>{n.type}</span>
+                              <span className="text-gray-600 text-[10px]">{new Date(n.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
                             </div>
-                            <p className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                              {n.title}
-                            </p>
-                            <p className={`text-xs mt-0.5 leading-relaxed ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                              {n.message}
-                            </p>
+                            <p className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{n.title}</p>
+                            <p className={`text-xs mt-0.5 leading-relaxed ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{n.message}</p>
                           </div>
                         ))
                       )}
@@ -454,23 +395,16 @@ export default function Navigation() {
             </div>
           )}
 
-          {/* ── Theme Toggle ── */}
+          {/* Theme Toggle — always visible */}
           <motion.button
             onClick={toggleTheme}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             className={`relative w-10 h-10 rounded-full flex items-center justify-center transition-colors duration-300 ${
-              theme === 'dark'
-                ? 'bg-gray-800 text-yellow-400 hover:bg-gray-700'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              theme === 'dark' ? 'bg-gray-800 text-yellow-400 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            <motion.div
-              key={theme}
-              initial={{ rotate: -30, opacity: 0, scale: 0.5 }}
-              animate={{ rotate: 0, opacity: 1, scale: 1 }}
-              transition={{ duration: 0.2 }}
-            >
+            <motion.div key={theme} initial={{ rotate: -30, opacity: 0, scale: 0.5 }} animate={{ rotate: 0, opacity: 1, scale: 1 }} transition={{ duration: 0.2 }}>
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </motion.div>
           </motion.button>
