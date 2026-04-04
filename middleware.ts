@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const PROTECTED = ['/bookings', '/checkout', '/seats', '/venue-dashboard', '/admin-panel', '/wishlist']
+const PROTECTED = ['/bookings', '/checkout', '/seat-selection', '/venue-dashboard', '/admin-panel', '/wishlist']
 const AUTH_ONLY = ['/login', '/register']
 
 export function middleware(req: NextRequest) {

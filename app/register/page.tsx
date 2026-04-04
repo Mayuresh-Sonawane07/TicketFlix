@@ -128,28 +128,8 @@ export default function RegisterPage() {
       window.dispatchEvent(new Event('authChange'))
       router.push(form.role === 'VENUE_OWNER' ? '/venue-dashboard' : '/')
     } catch (err: unknown) {
-      const data = (err as any)?.response?.data
-      setError(data?.non_field_errors?.[0] || data?.otp?.[0] || 'Invalid OTP. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
-      
-      // Fallback: login separately to get tokens
-      const { token: loginToken, refresh: loginRefresh, user: loginUser } = await authAPI.login(form.email, form.password)
-      localStorage.setItem('authToken', loginToken)
-      localStorage.setItem('refreshToken', loginRefresh)
-      const safeLoginUser = { id: loginUser.id, first_name: loginUser.first_name, role: loginUser.role }
-      localStorage.setItem('user', JSON.stringify(safeLoginUser))
-      window.dispatchEvent(new Event('authChange'))
-      router.push(form.role === 'VENUE_OWNER' ? '/venue-dashboard' : '/')
-    } catch (err: unknown) {
       const data = (err as { response?: { data?: { non_field_errors?: string[]; otp?: string[] } } })?.response?.data
-      setError(
-        data?.non_field_errors?.[0] ||
-        data?.otp?.[0] ||
-        'Invalid OTP. Please try again.'
-      )
+      setError(data?.non_field_errors?.[0] || data?.otp?.[0] || 'Invalid OTP. Please try again.')
     } finally {
       setLoading(false)
     }
