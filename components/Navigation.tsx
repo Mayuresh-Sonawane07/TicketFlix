@@ -126,6 +126,7 @@ export default function Navigation() {
   }, [])
 
   useEffect(() => {
+    setMounted(true)
     const updateNav = async () => {
       try {
         const res = await fetch('/api/auth/me')
