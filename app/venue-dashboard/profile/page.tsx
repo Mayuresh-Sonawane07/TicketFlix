@@ -23,9 +23,17 @@ export default function ProfilePage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (!userData) { router.push('/login'); return }
-    fetchProfile()
+    // ✅ Fixed: use /api/auth/me instead of localStorage
+    fetch('/api/auth/me')
+      .then(res => {
+        if (!res.ok) { router.push('/login'); return null }
+        return res.json()
+      })
+      .then(user => {
+        if (!user) return
+        fetchProfile()
+      })
+      .catch(() => router.push('/login'))
   }, [])
 
   const fetchProfile = async () => {
@@ -57,7 +65,8 @@ export default function ProfilePage() {
     try {
       const res = await profileAPI.update(form)
       setUser(res.data)
-      localStorage.setItem('user', JSON.stringify(res.data))
+      // ✅ Fixed: don't write to localStorage — cookies are the source of truth
+      // The user cookie is set server-side; local state is enough for UI
       showSuccess('Profile updated successfully!')
     } catch (err: any) {
       setError(err.response?.data?.email?.[0] || 'Failed to update profile.')
@@ -97,7 +106,9 @@ export default function ProfilePage() {
     setError('')
     try {
       await profileAPI.deleteAccount({ password: deletePassword })
-      localStorage.clear()
+      // ✅ Fixed: call proper logout endpoint instead of localStorage.clear()
+      await fetch('/api/auth/logout', { method: 'POST' })
+      window.dispatchEvent(new Event('authChange'))
       router.push('/')
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to delete account.')
@@ -118,7 +129,6 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-black">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
 
-        {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <Link href={backHref} className="text-gray-400 hover:text-white transition">
             <ArrowLeft size={24} />
@@ -143,9 +153,7 @@ export default function ProfilePage() {
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" />
           </div>
           <div>
-            <h2 className="text-white font-bold text-xl">
-              {user?.first_name || 'User'}
-            </h2>
+            <h2 className="text-white font-bold text-xl">{user?.first_name || 'User'}</h2>
             <p className="text-gray-400 text-sm">{user?.email}</p>
             <span className="px-2 py-0.5 bg-red-600/20 text-red-400 text-xs rounded-full mt-1 inline-block">
               {user?.role === 'VENUE_OWNER' ? 'Venue Owner' : 'Customer'}
@@ -157,9 +165,7 @@ export default function ProfilePage() {
         <AnimatePresence>
           {success && (
             <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               className="mb-4 p-4 bg-green-600/10 border border-green-600/50 rounded-lg flex items-center gap-2"
             >
               <CheckCircle size={16} className="text-green-500" />
@@ -168,9 +174,7 @@ export default function ProfilePage() {
           )}
           {error && (
             <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               className="mb-4 p-4 bg-red-600/10 border border-red-600/50 rounded-lg"
             >
               <p className="text-red-400 text-sm">{error}</p>
@@ -181,17 +185,16 @@ export default function ProfilePage() {
         {/* Tabs */}
         <div className="flex gap-1 mb-6 bg-gray-900 border border-gray-800 rounded-lg p-1">
           {[
-            { key: 'info', label: 'Personal Info' },
+            { key: 'info',     label: 'Personal Info' },
             { key: 'password', label: 'Password' },
-            { key: 'danger', label: 'Danger Zone' },
+            { key: 'danger',   label: 'Danger Zone' },
           ].map((tab) => (
             <button
               key={tab.key}
               onClick={() => { setActiveTab(tab.key as any); setError(''); setSuccess('') }}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition ${activeTab === tab.key
-                  ? 'bg-red-600 text-white'
-                  : 'text-gray-400 hover:text-white'
-                }`}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition ${
+                activeTab === tab.key ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'
+              }`}
             >
               {tab.label}
             </button>
@@ -201,8 +204,7 @@ export default function ProfilePage() {
         {/* Personal Info Tab */}
         {activeTab === 'info' && (
           <motion.form
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             onSubmit={handleUpdateProfile}
             className="space-y-4 bg-gray-900 border border-gray-800 rounded-xl p-6"
           >
@@ -210,43 +212,35 @@ export default function ProfilePage() {
               <label className="block text-sm font-medium text-gray-300 mb-2">Full Name</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                <input
-                  type="text" value={form.first_name}
+                <input type="text" value={form.first_name}
                   onChange={(e) => setForm({ ...form, first_name: e.target.value })}
                   placeholder="Your name"
-                  className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
-                />
+                  className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600" />
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                <input
-                  type="email" value={form.email}
+                <input type="email" value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   placeholder="your@email.com"
-                  className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
-                />
+                  className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600" />
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Phone Number</label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                <input
-                  type="tel" value={form.phone_number}
+                <input type="tel" value={form.phone_number}
                   onChange={(e) => setForm({ ...form, phone_number: e.target.value })}
                   placeholder="9876543210"
-                  className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
-                />
+                  className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600" />
               </div>
             </div>
-            <motion.button
-              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               type="submit" disabled={saving}
-              className="w-full py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 disabled:opacity-50"
-            >
+              className="w-full py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 disabled:opacity-50">
               {saving ? 'Saving...' : 'Save Changes'}
             </motion.button>
           </motion.form>
@@ -255,35 +249,30 @@ export default function ProfilePage() {
         {/* Password Tab */}
         {activeTab === 'password' && (
           <motion.form
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             onSubmit={handleChangePassword}
             className="space-y-4 bg-gray-900 border border-gray-800 rounded-xl p-6"
           >
             {[
-              { label: 'Current Password', key: 'old_password', placeholder: 'Enter current password' },
-              { label: 'New Password', key: 'new_password', placeholder: 'Min. 6 characters' },
-              { label: 'Confirm New Password', key: 'confirm', placeholder: 'Re-enter new password' },
+              { label: 'Current Password',     key: 'old_password', placeholder: 'Enter current password' },
+              { label: 'New Password',          key: 'new_password', placeholder: 'Min. 6 characters' },
+              { label: 'Confirm New Password',  key: 'confirm',      placeholder: 'Re-enter new password' },
             ].map((field) => (
               <div key={field.key}>
                 <label className="block text-sm font-medium text-gray-300 mb-2">{field.label}</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                  <input
-                    type="password"
+                  <input type="password"
                     value={passwords[field.key as keyof typeof passwords]}
                     onChange={(e) => setPasswords({ ...passwords, [field.key]: e.target.value })}
                     placeholder={field.placeholder}
-                    className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
-                  />
+                    className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600" />
                 </div>
               </div>
             ))}
-            <motion.button
-              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               type="submit" disabled={saving}
-              className="w-full py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 disabled:opacity-50"
-            >
+              className="w-full py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 disabled:opacity-50">
               {saving ? 'Changing...' : 'Change Password'}
             </motion.button>
           </motion.form>
@@ -292,8 +281,7 @@ export default function ProfilePage() {
         {/* Danger Zone Tab */}
         {activeTab === 'danger' && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             className="bg-gray-900 border border-red-600/30 rounded-xl p-6"
           >
             <h3 className="text-red-500 font-bold text-lg mb-2 flex items-center gap-2">
@@ -312,18 +300,13 @@ export default function ProfilePage() {
               </button>
             ) : (
               <div className="space-y-4">
-                <p className="text-yellow-400 text-sm font-medium">
-                  Enter your password to confirm deletion:
-                </p>
+                <p className="text-yellow-400 text-sm font-medium">Enter your password to confirm deletion:</p>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                  <input
-                    type="password"
-                    value={deletePassword}
+                  <input type="password" value={deletePassword}
                     onChange={(e) => setDeletePassword(e.target.value)}
                     placeholder="Enter your password"
-                    className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-red-600/50 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
-                  />
+                    className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-red-600/50 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600" />
                 </div>
                 <div className="flex gap-3">
                   <button

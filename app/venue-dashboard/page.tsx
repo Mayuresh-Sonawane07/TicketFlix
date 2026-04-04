@@ -11,17 +11,18 @@ export default function VenueDashboard() {
   const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (!userData) {
-      router.push('/login')
-      return
-    }
-    const parsed = JSON.parse(userData)
-    if (parsed.role !== 'VENUE_OWNER') {
-      router.push('/')
-      return
-    }
-    setUser(parsed)
+    // ✅ Fixed: use /api/auth/me instead of localStorage
+    fetch('/api/auth/me')
+      .then(res => {
+        if (!res.ok) { router.push('/login'); return null }
+        return res.json()
+      })
+      .then(user => {
+        if (!user) return
+        if (user.role !== 'VENUE_OWNER') { router.push('/'); return }
+        setUser(user)
+      })
+      .catch(() => router.push('/login'))
   }, [])
 
   if (!user) return (
@@ -34,57 +35,26 @@ export default function VenueDashboard() {
     <div className="min-h-screen bg-black">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
 
-        {/* Welcome */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-12"
         >
           <h1 className="text-4xl font-bold text-white mb-2">
-            Welcome, <span className="text-red-600">{user.first_name || user.email}</span>
+            Welcome, <span className="text-red-600">{user.first_name || 'Venue Owner'}</span>
           </h1>
           <p className="text-gray-400">Manage your events and track performance.</p>
         </motion.div>
 
-        {/* Quick Actions */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           {[
-            {
-              icon: <CalendarPlus size={28} className="text-red-500" />,
-              label: 'Create Event',
-              desc: 'Add a new event or show',
-              href: '/venue-dashboard/events/create',
-            },
-            {
-              icon: <List size={28} className="text-red-500" />,
-              label: 'My Events',
-              desc: 'View and manage your events',
-              href: '/venue-dashboard/events',
-            },
-            {
-              icon: <Ticket size={28} className="text-red-500" />,
-              label: 'Bookings',
-              desc: 'See who booked your events',
-              href: '/venue-dashboard/bookings',
-            },
-            {
-              icon: <TrendingUp size={28} className="text-red-500" />,
-              label: 'Analytics',
-              desc: 'Track your event performance',
-              href: '/venue-dashboard/analytics',
-            },
-            {
-              icon: <MapPin size={28} className="text-red-500" />,
-              label: 'My Venues',
-              desc: 'Manage your venues and screens',
-              href: '/venue-dashboard/venues',
-            },
+            { icon: <CalendarPlus size={28} className="text-red-500" />, label: 'Create Event',  desc: 'Add a new event or show',          href: '/venue-dashboard/events/create' },
+            { icon: <List size={28}        className="text-red-500" />, label: 'My Events',     desc: 'View and manage your events',       href: '/venue-dashboard/events' },
+            { icon: <Ticket size={28}      className="text-red-500" />, label: 'Bookings',      desc: 'See who booked your events',        href: '/venue-dashboard/bookings' },
+            { icon: <TrendingUp size={28}  className="text-red-500" />, label: 'Analytics',     desc: 'Track your event performance',      href: '/venue-dashboard/analytics' },
+            { icon: <MapPin size={28}      className="text-red-500" />, label: 'My Venues',     desc: 'Manage your venues and screens',    href: '/venue-dashboard/venues' },
           ].map((item) => (
-            <motion.div
-              key={item.label}
-              whileHover={{ scale: 1.03, y: -4 }}
-              transition={{ duration: 0.2 }}
-            >
+            <motion.div key={item.label} whileHover={{ scale: 1.03, y: -4 }} transition={{ duration: 0.2 }}>
               <Link href={item.href}>
                 <div className="bg-gray-900 border border-gray-800 hover:border-red-600/50 rounded-xl p-6 cursor-pointer transition-all">
                   <div className="mb-4">{item.icon}</div>
@@ -96,7 +66,6 @@ export default function VenueDashboard() {
           ))}
         </div>
 
-        {/* Info banner */}
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           <h2 className="text-white font-bold text-xl mb-2">Getting Started</h2>
           <p className="text-gray-400 text-sm">

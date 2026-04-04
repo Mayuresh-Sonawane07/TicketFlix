@@ -9,7 +9,7 @@ import { apiClient, Show, Event } from '@/lib/api'
 import { ArrowLeft, Clock, Globe, Tag, Calendar, MapPin, Star, Trash2, Send } from 'lucide-react'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') ||
-  'https://0e620814-4dfc-4257-903b-9cf2164c942d-00-3fr7449523dij.riker.replit.dev'
+  'https://web-production-cf420.up.railway.app'
 
 function getImageUrl(image?: string): string | null {
   if (!image) return null
@@ -67,7 +67,6 @@ export default function EventDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  // Review form state
   const [rating, setRating] = useState(0)
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -77,8 +76,12 @@ export default function EventDetailPage() {
   const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) setCurrentUser(JSON.parse(userData))
+    // ✅ Fixed: use /api/auth/me instead of localStorage
+    fetch('/api/auth/me')
+      .then(res => res.ok ? res.json() : null)
+      .then(user => { if (user) setCurrentUser(user) })
+      .catch(() => {})
+
     fetchData()
   }, [id])
 
@@ -209,13 +212,11 @@ export default function EventDetailPage() {
           {/* Left: About + Reviews */}
           <div className="lg:col-span-2 space-y-10">
 
-            {/* About */}
             <div>
               <h2 className="text-xl font-bold text-white mb-4">About</h2>
               <p className="text-gray-400 leading-relaxed">{event.description}</p>
             </div>
 
-            {/* Rating Summary */}
             {reviews.length > 0 && (
               <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
                 <h2 className="text-xl font-bold text-white mb-6">Ratings & Reviews</h2>
@@ -242,7 +243,6 @@ export default function EventDetailPage() {
                   </div>
                 </div>
 
-                {/* Review List */}
                 <div className="space-y-4">
                   {reviews.map((review) => (
                     <motion.div
@@ -288,7 +288,6 @@ export default function EventDetailPage() {
               </div>
             )}
 
-            {/* Write Review */}
             {currentUser && currentUser.role === 'Customer' && (
               <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
                 {userReview ? (
@@ -349,7 +348,6 @@ export default function EventDetailPage() {
               </div>
             )}
 
-            {/* No reviews yet */}
             {reviews.length === 0 && (
               <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
                 <h2 className="text-xl font-bold text-white mb-2">Ratings & Reviews</h2>

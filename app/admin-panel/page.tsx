@@ -27,7 +27,7 @@ type Tab = 'dashboard' | 'venue-owners' | 'users' | 'events' | 'shows' | 'bookin
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 // ✅ Fixed: was /admin-panel/... — now routes through apiClient baseURL /api/proxy
-const api = (path: string) => `/admin${path}`
+const api = (path: string) => `/admin-panel${path}`
 
 function fmt(n: number) {
   return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n)

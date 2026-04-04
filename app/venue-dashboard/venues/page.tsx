@@ -14,9 +14,9 @@ export default function MyVenuesPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
   useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (!userData) { router.push('/login'); return }
-    const user = JSON.parse(userData)
+    const res = await fetch('/api/auth/me')
+    if (!res.ok) { router.push('/login'); return }
+    const user = await res.json()
     if (user.role !== 'VENUE_OWNER') { router.push('/'); return }
     fetchVenues()
   }, [])

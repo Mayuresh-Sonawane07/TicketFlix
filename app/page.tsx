@@ -35,11 +35,10 @@ const jsonLd = {
 export default function Home() {
   const router = useRouter()
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [authChecked, setAuthChecked] = useState(false)
 
-  // ── City state (controlled by navbar via custom event) ───
   const [selectedCity, setSelectedCity] = useState<string>('All')
 
-  // ── Listen for city changes from navbar ──────────────────
   useEffect(() => {
     const handleCityChange = (e: CustomEvent) => {
       const city = e.detail
@@ -49,10 +48,8 @@ export default function Home() {
     return () => window.removeEventListener('cityChange', handleCityChange as EventListener)
   }, [])
 
-  // ── Events (pass city to hook) ───────────────────────────
   const { events, loading, error } = useEvents(selectedCity !== 'All' ? selectedCity : undefined)
 
-  // ── Other filters ────────────────────────────────────────
   const [search, setSearch] = useState('')
   const [selectedType, setSelectedType] = useState('All')
   const [selectedLanguage, setSelectedLanguage] = useState('All')
@@ -60,21 +57,20 @@ export default function Home() {
   const [sortBy, setSortBy] = useState('default')
   const [showFilters, setShowFilters] = useState(false)
 
-  // ── Redirect venue owner ─────────────────────────────────
+  // ✅ Fixed: use /api/auth/me instead of localStorage
   useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      try {
-        const user = JSON.parse(userData)
-        setUserRole(user.role)
-        if (user.role === 'VENUE_OWNER') router.push('/venue-dashboard')
-      } catch {
-        setUserRole(null)
-      }
-    }
+    fetch('/api/auth/me')
+      .then(res => res.ok ? res.json() : null)
+      .then(user => {
+        if (user?.role) {
+          setUserRole(user.role)
+          if (user.role === 'VENUE_OWNER') router.push('/venue-dashboard')
+        }
+      })
+      .catch(() => {})
+      .finally(() => setAuthChecked(true))
   }, [])
 
-  // ── Derived filter options ───────────────────────────────
   const languages = useMemo(() => {
     const langs = events.flatMap(e =>
       e.language
@@ -93,10 +89,8 @@ export default function Home() {
     return ['All', ...Array.from(new Set(gs)).sort()]
   }, [events])
 
-  // ── Client-side filtering ────────────────────────────────
   const filteredEvents = useMemo(() => {
     let result = [...events]
-
     if (search.trim()) {
       const q = search.toLowerCase()
       result = result.filter(e =>
@@ -118,14 +112,12 @@ export default function Home() {
           .some(g => g === selectedGenre.toLowerCase())
       )
     }
-
     switch (sortBy) {
-      case 'title_asc': result.sort((a, b) => a.title.localeCompare(b.title)); break
+      case 'title_asc':  result.sort((a, b) => a.title.localeCompare(b.title)); break
       case 'title_desc': result.sort((a, b) => b.title.localeCompare(a.title)); break
-      case 'date_asc': result.sort((a, b) => new Date(a.release_date || 0).getTime() - new Date(b.release_date || 0).getTime()); break
-      case 'date_desc': result.sort((a, b) => new Date(b.release_date || 0).getTime() - new Date(a.release_date || 0).getTime()); break
+      case 'date_asc':   result.sort((a, b) => new Date(a.release_date || 0).getTime() - new Date(b.release_date || 0).getTime()); break
+      case 'date_desc':  result.sort((a, b) => new Date(b.release_date || 0).getTime() - new Date(a.release_date || 0).getTime()); break
     }
-
     return result
   }, [events, search, selectedType, selectedLanguage, selectedGenre, sortBy])
 
@@ -139,11 +131,11 @@ export default function Home() {
     setSelectedLanguage('All')
     setSelectedGenre('All')
     setSortBy('default')
-    // Reset city in navbar too
     window.dispatchEvent(new CustomEvent('cityChange', { detail: 'All Cities' }))
   }
 
-  if (userRole === 'VENUE_OWNER') {
+  // Show redirect splash only after auth check confirms VENUE_OWNER
+  if (authChecked && userRole === 'VENUE_OWNER') {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <p className="text-gray-400">Redirecting to dashboard...</p>
