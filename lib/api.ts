@@ -1,25 +1,11 @@
 import axios from "axios"
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "http://0e620814-4dfc-4257-903b-9cf2164c942d-00-3fr7449523dij.riker.replit.dev/api"
-
 export const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: '/api/proxy',
   headers: {
     "Content-Type": "application/json",
   },
-})
-
-// Attach Bearer token to every request
-apiClient.interceptors.request.use((config) => {
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("authToken")
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-  }
-  return config
+  withCredentials: true,
 })
 
 // Auto-refresh access token when it expires (401)
@@ -30,26 +16,13 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
       try {
-        const refreshToken = localStorage.getItem("refreshToken")
-        if (!refreshToken) {
-          localStorage.removeItem("authToken")
-          localStorage.removeItem("refreshToken")
-          localStorage.removeItem("user")
+        const res = await fetch('/api/auth/refresh', { method: 'POST' })
+        if (!res.ok) {
           if (typeof window !== "undefined") window.location.href = "/login"
           return Promise.reject(error)
         }
-        const res = await axios.post(`${API_BASE_URL}/users/token/refresh/`, {
-          refresh: refreshToken,
-        })
-        const newAccessToken = res.data.access
-        localStorage.setItem("authToken", newAccessToken)
-        localStorage.setItem("refreshToken", res.data.refresh)
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
         return apiClient(originalRequest)
       } catch {
-        localStorage.removeItem("authToken")
-        localStorage.removeItem("refreshToken")
-        localStorage.removeItem("user")
         if (typeof window !== "undefined") window.location.href = "/login"
         return Promise.reject(error)
       }

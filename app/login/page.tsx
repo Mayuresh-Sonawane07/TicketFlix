@@ -34,11 +34,7 @@ export default function Login() {
     return err?.response?.data?.error || 'Login failed. Please try again.'
   }
 
-  const handleLoginSuccess = (token: string, refresh: string, user: any) => {
-    localStorage.setItem('authToken', token)
-    localStorage.setItem('refreshToken', refresh)
-    const safeUser = { id: user.id, first_name: user.first_name, role: user.role }
-    localStorage.setItem('user', JSON.stringify(safeUser))
+  const handleLoginSuccess = (user: any) => {
     window.dispatchEvent(new Event('authChange'))
     if (user.role === 'Admin') router.push('/admin-panel')
     else if (user.role === 'VENUE_OWNER') router.push('/venue-dashboard')
@@ -48,16 +44,19 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    if (!email || !password) {
-      setError('Please fill in all fields.')
-      return
-    }
+    if (!email || !password) { setError('Please fill in all fields.'); return }
     try {
       setIsLoading(true)
-      const { token, refresh, user } = await authAPI.login(email, password)
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error || 'Login failed'); return }
       if (rememberMe) localStorage.setItem('rememberedEmail', email)
       else localStorage.removeItem('rememberedEmail')
-      handleLoginSuccess(token, refresh, user)
+      handleLoginSuccess(data.user)
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -69,10 +68,16 @@ export default function Login() {
     setError(null)
     setIsGoogleLoading(true)
     try {
-      const res = await authAPI.googleLogin(response.credential)
-      handleLoginSuccess(res.token, res.refresh, res.user)
-    } catch (err: any) {
-      setError(err?.response?.data?.error || 'Google login failed. Please try again.')
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ google_token: response.credential }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error || 'Google login failed'); return }
+      handleLoginSuccess(data.user)
+    } catch {
+      setError('Google login failed.')
     } finally {
       setIsGoogleLoading(false)
     }

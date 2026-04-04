@@ -284,9 +284,9 @@ export default function SeatSelectionPage() {
   const [timerExpired, setTimerExpired] = useState(false)
 
   useEffect(() => {
-    const token = localStorage.getItem('authToken')
-    if (!token) { router.push('/login'); return }
-    ;(async () => {
+    (async () => {
+      const userRes = await fetch('/api/auth/me')
+      if (!userRes.ok) { router.push('/login'); return }
       try {
         const [showRes, seatsRes] = await Promise.all([
           apiClient.get<any>(`/theaters/shows/${showId}/`),

@@ -119,12 +119,10 @@ export default function Navigation() {
   )
 
   // ── Fetch notifications for logged-in user ────────────────────
-  const fetchNotifications = (token: string) => {
-    fetch(`${API_BASE}/users/notifications/`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-      .then(r => r.json())
-      .then(data => {
+  const fetchNotifications = () => {
+    apiClient.get('/users/notifications/')
+      .then(r => {
+        const data = r.data
         if (Array.isArray(data)) {
           setNotifications(data)
           const dayAgo = Date.now() - 86400000
@@ -138,76 +136,39 @@ export default function Navigation() {
 
   // ── Auth state ────────────────────────────────────────────────
   useEffect(() => {
-    const updateNav = () => {
-      const token    = localStorage.getItem('authToken')
-      const userData = localStorage.getItem('user')
-
-      const isTokenExpired = (t: string) => {
-        try {
-          const payload = JSON.parse(atob(t.split('.')[1]))
-          return payload.exp * 1000 < Date.now()
-        } catch { return true }
-      }
-
-      const validToken =
-        token &&
-        token !== 'undefined' &&
-        token !== 'null' &&
-        token.length > 10 &&
-        !isTokenExpired(token)
-
-      if (validToken && userData) {
-        try {
-          const parsed = JSON.parse(userData)
-          if (parsed && parsed.role) {
-            setIsLoggedIn(true)
-            setUser(parsed)
-            // Fetch notifications for non-admin users
-            if (parsed.role !== 'Admin') {
-              fetchNotifications(token as string)
-            }
-          } else {
-            setIsLoggedIn(false)
-            setUser(null)
-            localStorage.removeItem('authToken')
-            localStorage.removeItem('refreshToken')
-            localStorage.removeItem('user')
-          }
-        } catch {
-          setIsLoggedIn(false)
-          setUser(null)
-          localStorage.removeItem('authToken')
-          localStorage.removeItem('refreshToken')
-          localStorage.removeItem('user')
+    const updateNav = async () => {
+      try {
+        const res = await fetch('/api/auth/me')
+        if (!res.ok) { setIsLoggedIn(false); setUser(null); return }
+        const parsed = await res.json()
+        if (parsed?.role) {
+          setIsLoggedIn(true)
+          setUser(parsed)
+          if (parsed.role !== 'Admin') fetchNotifications()
+        } else {
+          setIsLoggedIn(false); setUser(null)
         }
-      } else {
-        setIsLoggedIn(false)
-        setUser(null)
-        localStorage.removeItem('authToken')
-        localStorage.removeItem('refreshToken')
-        localStorage.removeItem('user')
+      } catch {
+        setIsLoggedIn(false); setUser(null)
       }
     }
 
     updateNav()
     setMounted(true)
-    window.addEventListener('storage', updateNav)
     window.addEventListener('authChange', updateNav)
     return () => {
-      window.removeEventListener('storage', updateNav)
       window.removeEventListener('authChange', updateNav)
     }
   }, [])
 
-  const handleLogout = () => {
-    localStorage.removeItem('authToken')
-    localStorage.removeItem('refreshToken')
-    localStorage.removeItem('user')
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' })
     setIsLoggedIn(false)
     setUser(null)
     setNotifications([])
     setUnreadCount(0)
     router.push('/login')
+    window.dispatchEvent(new Event('authChange'))
   }
 
   const isVenueOwner = user?.role === 'VENUE_OWNER'

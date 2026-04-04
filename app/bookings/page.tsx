@@ -19,24 +19,22 @@ function BookingsContent() {
   const showSuccess = searchParams.get('success') === 'true'
 
   useEffect(() => {
-    const token = localStorage.getItem('authToken')
-    if (!token) { router.push('/login'); return }
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      const user = JSON.parse(userData)
-      setUserRole(user.role)
-    }
-    fetchBookings()
+    fetch('/api/auth/me')
+      .then(r => r.ok ? r.json() : null)
+      .then(user => {
+        if (!user) { router.push('/login'); return }
+        setUserRole(user.role)
+        fetchBookings(user.role)
+      })
   }, [])
 
-  const fetchBookings = async () => {
+  const fetchBookings = async (role: string) => {
     try {
-      const userData = localStorage.getItem('user')
-      const user = userData ? JSON.parse(userData) : null
-      const endpoint = user?.role === 'VENUE_OWNER' ? '/bookings/venue_analytics/' : '/bookings/'
+      const endpoint = role === 'VENUE_OWNER' ? '/bookings/venue_analytics/' : '/bookings/'
       const res = await apiClient.get(endpoint)
       const data = res.data
-      setBookings(Array.isArray(data) ? data : (data as { results?: Booking[] }).results ?? [])    } catch {
+      setBookings(Array.isArray(data) ? data : (data as any).results ?? [])
+    } catch {
       setError('Failed to load bookings')
     } finally {
       setLoading(false)

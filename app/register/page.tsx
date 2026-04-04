@@ -117,20 +117,23 @@ export default function RegisterPage() {
     setError('')
     setSuccess('')
     try {
-      // Verify OTP — now returns tokens directly
-      const verifyRes = await authAPI.verifyOTP({ email: form.email, otp })
-      const { token, refresh, user } = verifyRes as { token: string; refresh: string; user: { id: number; first_name?: string; role: string } }
-
-      // If verifyOTP returns tokens directly, use them
-      if (token && refresh && user) {
-        localStorage.setItem('authToken', token)
-        localStorage.setItem('refreshToken', refresh)
-        const safeUser = { id: user.id, first_name: user.first_name, role: user.role }
-        localStorage.setItem('user', JSON.stringify(safeUser))
-        window.dispatchEvent(new Event('authChange'))
-        router.push(form.role === 'VENUE_OWNER' ? '/venue-dashboard' : '/')
-        return
-      }
+      await authAPI.verifyOTP({ email: form.email, otp })
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email, password: form.password }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error || 'Login failed after registration'); return }
+      window.dispatchEvent(new Event('authChange'))
+      router.push(form.role === 'VENUE_OWNER' ? '/venue-dashboard' : '/')
+    } catch (err: unknown) {
+      const data = (err as any)?.response?.data
+      setError(data?.non_field_errors?.[0] || data?.otp?.[0] || 'Invalid OTP. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
       
       // Fallback: login separately to get tokens
       const { token: loginToken, refresh: loginRefresh, user: loginUser } = await authAPI.login(form.email, form.password)
