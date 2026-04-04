@@ -1,18 +1,16 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Film, LogOut, LayoutDashboard, CalendarPlus, List, User,
-  MapPin, Sun, Moon, Heart, ChevronDown, Loader2, Search,
-  Bell,
+  MapPin, Sun, Moon, Heart, ChevronDown, Loader2, Search, Bell,
 } from 'lucide-react'
 import { useTheme } from '@/components/ThemeProvider'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWishlist } from '@/hooks/useWishlist'
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://web-production-cf420.up.railway.app/api'
+import { apiClient } from '@/lib/api'   // ✅ import apiClient
 
 interface UserData {
   id: number
@@ -36,34 +34,30 @@ export default function Navigation() {
   const router = useRouter()
   const { theme, toggleTheme } = useTheme()
   const { wishlist } = useWishlist()
-  const [isLoggedIn, setIsLoggedIn]   = useState(false)
-  const [user, setUser]               = useState<UserData | null>(null)
-  const [mounted, setMounted]         = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [user, setUser]             = useState<UserData | null>(null)
+  const [mounted, setMounted]       = useState(false)
 
-  // ── City state ────────────────────────────────────────────────
-  const [selectedCity, setSelectedCity]       = useState<string>('All Cities')
-  const [availableCities, setAvailableCities] = useState<string[]>([])
+  const [selectedCity, setSelectedCity]         = useState('All Cities')
+  const [availableCities, setAvailableCities]   = useState<string[]>([])
   const [cityDropdownOpen, setCityDropdownOpen] = useState(false)
-  const [citySearch, setCitySearch]           = useState('')
+  const [citySearch, setCitySearch]             = useState('')
   const [detectingLocation, setDetectingLocation] = useState(false)
-  const [locationError, setLocationError]     = useState('')
+  const [locationError, setLocationError]       = useState('')
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // ── Notification state ────────────────────────────────────────
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [notifOpen, setNotifOpen]         = useState(false)
   const [unreadCount, setUnreadCount]     = useState(0)
   const notifRef = useRef<HTMLDivElement>(null)
 
-  // ── Fetch cities ──────────────────────────────────────────────
+  // ✅ Use proxy route instead of direct API call (avoids CORS)
   useEffect(() => {
-    fetch(`${API_BASE}/events/cities/`)
-      .then(res => res.json())
-      .then((cities: string[]) => setAvailableCities(cities))
+    apiClient.get<string[]>('/events/cities/')
+      .then(r => setAvailableCities(Array.isArray(r.data) ? r.data : []))
       .catch(() => {})
   }, [])
 
-  // ── Close dropdowns on outside click ─────────────────────────
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -79,7 +73,6 @@ export default function Navigation() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // ── Auto-detect location ──────────────────────────────────────
   const detectLocation = () => {
     if (!navigator.geolocation) { setLocationError('Geolocation not supported'); return }
     setDetectingLocation(true)
@@ -118,23 +111,20 @@ export default function Navigation() {
     c.toLowerCase().includes(citySearch.toLowerCase())
   )
 
-  // ── Fetch notifications for logged-in user ────────────────────
-  const fetchNotifications = () => {
-    apiClient.get('/users/notifications/')
+  // ✅ useCallback so it's stable and can be safely called from useEffect
+  const fetchNotifications = useCallback(() => {
+    apiClient.get<Notification[]>('/users/notifications/')
       .then(r => {
         const data = r.data
         if (Array.isArray(data)) {
           setNotifications(data)
           const dayAgo = Date.now() - 86400000
-          setUnreadCount(data.filter((n: Notification) =>
-            new Date(n.created_at).getTime() > dayAgo
-          ).length)
+          setUnreadCount(data.filter(n => new Date(n.created_at).getTime() > dayAgo).length)
         }
       })
       .catch(() => {})
-  }
+  }, [])
 
-  // ── Auth state ────────────────────────────────────────────────
   useEffect(() => {
     const updateNav = async () => {
       try {
@@ -144,22 +134,22 @@ export default function Navigation() {
         if (parsed?.role) {
           setIsLoggedIn(true)
           setUser(parsed)
-          if (parsed.role !== 'Admin') fetchNotifications()
+          if (parsed.role !== 'Admin') fetchNotifications()  // ✅ now safe to call
         } else {
-          setIsLoggedIn(false); setUser(null)
+          setIsLoggedIn(false)
+          setUser(null)
         }
       } catch {
-        setIsLoggedIn(false); setUser(null)
+        setIsLoggedIn(false)
+        setUser(null)
       }
     }
 
     updateNav()
     setMounted(true)
     window.addEventListener('authChange', updateNav)
-    return () => {
-      window.removeEventListener('authChange', updateNav)
-    }
-  }, [])
+    return () => window.removeEventListener('authChange', updateNav)
+  }, [fetchNotifications])  // ✅ stable dep, no infinite loop
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
