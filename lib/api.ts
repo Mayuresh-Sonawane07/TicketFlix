@@ -203,14 +203,14 @@ export const authAPI = {
     phone_number: string
     password: string
     role: 'Customer' | 'VENUE_OWNER'
-  }) => apiClient.post("/register/", data),
+  }) => apiClient.post("/users/register/", data),
 
   verifyOTP: async (data: {
     email: string
     otp: string
   }): Promise<{ token: string; refresh: string; user: SafeUser }> => {
     const response = await apiClient.post<{ token: string; refresh: string; user: User }>(
-      "/verify-otp/",
+      "/users/verify-otp/",
       data
     )
     return {
@@ -221,7 +221,7 @@ export const authAPI = {
 
   login: async (email: string, password: string): Promise<{ token: string; refresh: string; user: SafeUser }> => {
     const response = await apiClient.post<{ token: string; refresh: string; user: User }>(
-      "login/",
+      "/users/login/",
       { email, password }
     )
     return {
@@ -232,7 +232,7 @@ export const authAPI = {
 
   googleLogin: async (token: string): Promise<{ token: string; refresh: string; user: SafeUser }> => {
     const response = await apiClient.post<{ token: string; refresh: string; user: User }>(
-      '/google-login/',
+      '/users/google-login/',
       { token }
     )
     return {
@@ -242,16 +242,16 @@ export const authAPI = {
   },
 
   refreshToken: (refresh: string) =>
-    apiClient.post<{ access: string }>('/token/refresh/', { refresh }),
+    apiClient.post<{ access: string }>('/users/token/refresh/', { refresh }),
 
   logout: (refresh: string) =>
-    apiClient.post('/logout/', { refresh }),
+    apiClient.post('/users/logout/', { refresh }),
 
   forgotPassword: (email: string) =>
-    apiClient.post('/forgot-password/', { email }),
+    apiClient.post('/users/forgot-password/', { email }),
 
   resetPassword: (data: { email: string; otp: string; new_password: string }) =>
-    apiClient.post('/reset-password/', data),
+    apiClient.post('/users/reset-password/', data),
 }
 
 export const profileAPI = {
@@ -262,7 +262,7 @@ export const profileAPI = {
   deleteAccount: (data: { password: string }) =>
     apiClient.delete('/users/delete-account/', { data }),
   resendOTP: (email: string) =>
-    apiClient.post('/resend-otp/', { email }),
+    apiClient.post('/users/resend-otp/', { email }),
 }
 
 export const paymentAPI = {
