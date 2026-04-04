@@ -10,7 +10,7 @@ import {
 import { useTheme } from '@/components/ThemeProvider'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWishlist } from '@/hooks/useWishlist'
-import { apiClient } from '@/lib/api'   // ✅ import apiClient
+import { apiClient } from '@/lib/api'
 
 interface UserData {
   id: number
@@ -37,6 +37,7 @@ export default function Navigation() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [user, setUser]             = useState<UserData | null>(null)
   const [mounted, setMounted]       = useState(false)
+  const [authLoading, setAuthLoading] = useState(true) // ✅ NEW: prevents flash
 
   const [selectedCity, setSelectedCity]         = useState('All Cities')
   const [availableCities, setAvailableCities]   = useState<string[]>([])
@@ -51,7 +52,6 @@ export default function Navigation() {
   const [unreadCount, setUnreadCount]     = useState(0)
   const notifRef = useRef<HTMLDivElement>(null)
 
-  // ✅ Use proxy route instead of direct API call (avoids CORS)
   useEffect(() => {
     apiClient.get<string[]>('/events/cities/')
       .then(r => setAvailableCities(Array.isArray(r.data) ? r.data : []))
@@ -111,7 +111,6 @@ export default function Navigation() {
     c.toLowerCase().includes(citySearch.toLowerCase())
   )
 
-  // ✅ useCallback so it's stable and can be safely called from useEffect
   const fetchNotifications = useCallback(() => {
     apiClient.get<Notification[]>('/users/notifications/')
       .then(r => {
@@ -127,15 +126,21 @@ export default function Navigation() {
 
   useEffect(() => {
     setMounted(true)
+
     const updateNav = async () => {
+      setAuthLoading(true) // ✅ start loading before fetch
       try {
         const res = await fetch('/api/auth/me')
-        if (!res.ok) { setIsLoggedIn(false); setUser(null); return }
+        if (!res.ok) {
+          setIsLoggedIn(false)
+          setUser(null)
+          return
+        }
         const parsed = await res.json()
         if (parsed?.role) {
           setIsLoggedIn(true)
           setUser(parsed)
-          if (parsed.role !== 'Admin') fetchNotifications()  // ✅ now safe to call
+          if (parsed.role !== 'Admin') fetchNotifications()
         } else {
           setIsLoggedIn(false)
           setUser(null)
@@ -143,14 +148,15 @@ export default function Navigation() {
       } catch {
         setIsLoggedIn(false)
         setUser(null)
+      } finally {
+        setAuthLoading(false) // ✅ done loading — now render nav items
       }
     }
 
     updateNav()
-    setMounted(true)
     window.addEventListener('authChange', updateNav)
     return () => window.removeEventListener('authChange', updateNav)
-  }, [fetchNotifications])  // ✅ stable dep, no infinite loop
+  }, [fetchNotifications])
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -176,6 +182,9 @@ export default function Navigation() {
     event:        'bg-emerald-500/15 text-emerald-400',
   }
 
+  // ✅ Render a stable skeleton while auth is resolving — no flash
+  const showNav = mounted && !authLoading
+
   return (
     <nav className={`sticky top-0 z-50 border-b transition-colors duration-300 ${
       theme === 'dark'
@@ -193,7 +202,7 @@ export default function Navigation() {
         <div className="flex items-center gap-4">
 
           {/* ── City Selector ── */}
-          {(isCustomer || !isLoggedIn) && (
+          {showNav && (isCustomer || !isLoggedIn) && (
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setCityDropdownOpen(!cityDropdownOpen)}
@@ -291,8 +300,17 @@ export default function Navigation() {
 
           {/* ── Nav Links ── */}
 
+          {/* Loading skeleton — prevents layout shift while auth resolves */}
+          {mounted && authLoading && (
+            <div className="flex items-center gap-3">
+              <div className={`h-4 w-16 rounded animate-pulse ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-200'}`} />
+              <div className={`h-8 w-16 rounded-lg animate-pulse ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-200'}`} />
+              <div className={`h-8 w-20 rounded-lg animate-pulse ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-200'}`} />
+            </div>
+          )}
+
           {/* Not logged in */}
-          {mounted && !isLoggedIn && (
+          {showNav && !isLoggedIn && (
             <>
               <Link href="/" className={navLinkClass}>Events</Link>
               <Link href="/login" className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold text-sm">
@@ -305,7 +323,7 @@ export default function Navigation() {
           )}
 
           {/* Customer */}
-          {mounted && isLoggedIn && isCustomer && (
+          {showNav && isLoggedIn && isCustomer && (
             <>
               <Link href="/" className={navLinkClass}>Events</Link>
               <Link href="/bookings" className={navLinkClass}>My Bookings</Link>
@@ -317,7 +335,7 @@ export default function Navigation() {
           )}
 
           {/* Venue Owner */}
-          {mounted && isLoggedIn && isVenueOwner && (
+          {showNav && isLoggedIn && isVenueOwner && (
             <>
               <Link href="/venue-dashboard" className={`flex items-center gap-1.5 ${navLinkClass}`}>
                 <LayoutDashboard size={16} /> Dashboard
@@ -341,7 +359,7 @@ export default function Navigation() {
           )}
 
           {/* ── Wishlist — customers only ── */}
-          {mounted && isLoggedIn && isCustomer && (
+          {showNav && isLoggedIn && isCustomer && (
             <Link href="/wishlist" className="relative">
               <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
                 className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors duration-300 ${
@@ -358,7 +376,7 @@ export default function Navigation() {
           )}
 
           {/* ── Notification Bell — customers & venue owners ── */}
-          {mounted && isLoggedIn && (isCustomer || isVenueOwner) && (
+          {showNav && isLoggedIn && (isCustomer || isVenueOwner) && (
             <div className="relative" ref={notifRef}>
               <button
                 onClick={() => { setNotifOpen(!notifOpen); setUnreadCount(0) }}
@@ -385,7 +403,6 @@ export default function Navigation() {
                       theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
                     }`}
                   >
-                    {/* Header */}
                     <div className={`px-4 py-3 border-b flex items-center justify-between ${theme === 'dark' ? 'border-gray-700' : 'border-gray-100'}`}>
                       <p className={`text-xs font-semibold uppercase tracking-wide ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                         Notifications
@@ -397,7 +414,6 @@ export default function Navigation() {
                       )}
                     </div>
 
-                    {/* List */}
                     <div className="max-h-80 overflow-y-auto">
                       {notifications.length === 0 ? (
                         <div className="py-10 text-center">
