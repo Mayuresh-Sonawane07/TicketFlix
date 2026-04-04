@@ -1,31 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const DJANGO = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://web-production-cf420.up.railway.app/api'
+const DJANGO =
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  'https://web-production-cf420.up.railway.app/api'
 
-async function handler(req: NextRequest, { params }: { params: { path: string[] } }) {
+async function handler(
+  req: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  const { path } = await params  // ✅ Next.js 15: params is a Promise
   const token = req.cookies.get('authToken')?.value
-  const path  = params.path.join('/')
-  const url   = `${DJANGO}/${path}${req.nextUrl.search}`
+  const url = `${DJANGO}/${path.join('/')}${req.nextUrl.search}`
+
+  // ✅ Forward original Content-Type instead of hardcoding JSON
+  const contentType = req.headers.get('Content-Type') || 'application/json'
 
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    'Content-Type': contentType,
   }
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const body = req.method !== 'GET' && req.method !== 'HEAD'
-    ? await req.text() : undefined
+  const body =
+    req.method !== 'GET' && req.method !== 'HEAD'
+      ? await req.text()
+      : undefined
 
-  const res = await fetch(url, {
-    method: req.method,
-    headers,
-    body,
-  })
+  try {
+    const res = await fetch(url, {
+      method: req.method,
+      headers,
+      body,
+    })
 
-  const data = await res.text()
-  return new NextResponse(data, {
-    status: res.status,
-    headers: { 'Content-Type': res.headers.get('Content-Type') || 'application/json' },
-  })
+    const data = await res.text()
+    return new NextResponse(data, {
+      status: res.status,
+      headers: {
+        'Content-Type': res.headers.get('Content-Type') || 'application/json',
+      },
+    })
+  } catch (err) {
+    // ✅ Catch network errors (backend down, timeout, DNS failure)
+    console.error(`[proxy] Failed to reach backend at ${url}:`, err)
+    return NextResponse.json(
+      { error: 'Backend unreachable', detail: String(err) },
+      { status: 503 }
+    )
+  }
 }
 
-export { handler as GET, handler as POST, handler as PUT, handler as PATCH, handler as DELETE }
+export {
+  handler as GET,
+  handler as POST,
+  handler as PUT,
+  handler as PATCH,
+  handler as DELETE,
+}

@@ -13,17 +13,28 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config
-    if (error.response?.status === 401 && !originalRequest._retry) {
+
+    // ✅ Don't retry auth-check or refresh endpoints — avoids redirect loops
+    const isAuthEndpoint =
+      originalRequest?.url?.includes('/auth/') ||
+      originalRequest?.url?.includes('/users/login') ||
+      originalRequest?.url?.includes('/users/register')
+
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !isAuthEndpoint
+    ) {
       originalRequest._retry = true
       try {
         const res = await fetch('/api/auth/refresh', { method: 'POST' })
         if (!res.ok) {
-          if (typeof window !== "undefined") window.location.href = "/login"
+          if (typeof window !== 'undefined') window.location.href = '/login'
           return Promise.reject(error)
         }
         return apiClient(originalRequest)
       } catch {
-        if (typeof window !== "undefined") window.location.href = "/login"
+        if (typeof window !== 'undefined') window.location.href = '/login'
         return Promise.reject(error)
       }
     }
