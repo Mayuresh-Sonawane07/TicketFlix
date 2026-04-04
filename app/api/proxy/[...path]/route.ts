@@ -8,39 +8,30 @@ async function handler(
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
-  const { path } = await params  // ✅ Next.js 15: params is a Promise
+  const { path } = await params
   const token = req.cookies.get('authToken')?.value
-  const url = `${DJANGO}/${path.join('/')}${req.nextUrl.search}`
 
-  // ✅ Forward original Content-Type instead of hardcoding JSON
+  // ✅ Always append trailing slash — Django requires it
+  const pathStr = path.join('/')
+  const url = `${DJANGO}/${pathStr}/${req.nextUrl.search}`
+  //                                 ↑ added
+
   const contentType = req.headers.get('Content-Type') || 'application/json'
-
-  const headers: Record<string, string> = {
-    'Content-Type': contentType,
-  }
+  const headers: Record<string, string> = { 'Content-Type': contentType }
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const body =
-    req.method !== 'GET' && req.method !== 'HEAD'
-      ? await req.text()
-      : undefined
+  const body = req.method !== 'GET' && req.method !== 'HEAD'
+    ? await req.text()
+    : undefined
 
   try {
-    const res = await fetch(url, {
-      method: req.method,
-      headers,
-      body,
-    })
-
+    const res = await fetch(url, { method: req.method, headers, body })
     const data = await res.text()
     return new NextResponse(data, {
       status: res.status,
-      headers: {
-        'Content-Type': res.headers.get('Content-Type') || 'application/json',
-      },
+      headers: { 'Content-Type': res.headers.get('Content-Type') || 'application/json' },
     })
   } catch (err) {
-    // ✅ Catch network errors (backend down, timeout, DNS failure)
     console.error(`[proxy] Failed to reach backend at ${url}:`, err)
     return NextResponse.json(
       { error: 'Backend unreachable', detail: String(err) },
@@ -49,10 +40,4 @@ async function handler(
   }
 }
 
-export {
-  handler as GET,
-  handler as POST,
-  handler as PUT,
-  handler as PATCH,
-  handler as DELETE,
-}
+export { handler as GET, handler as POST, handler as PUT, handler as PATCH, handler as DELETE }
