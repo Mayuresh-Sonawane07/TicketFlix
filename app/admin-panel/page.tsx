@@ -7,9 +7,9 @@ import { apiClient } from '@/lib/api'
 import {
   LayoutDashboard, Users, CalendarDays, Ticket, BarChart3,
   ShieldAlert, Bell, Play, CheckCircle2, XCircle, Flag,
-  Trash2, Ban, UserCheck, RefreshCw, Send, ChevronDown,
+  Trash2, Ban, UserCheck, Send,
   TrendingUp, AlertTriangle, DollarSign, Activity, Clock,
-  Eye, Edit3, X, Check, LogOut,
+  X, Check, LogOut,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -26,7 +26,8 @@ type Tab = 'dashboard' | 'venue-owners' | 'users' | 'events' | 'shows' | 'bookin
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const api = (path: string) => `/admin-panel${path}`
+// ✅ Fixed: was /admin-panel/... — now routes through apiClient baseURL /api/proxy
+const api = (path: string) => `/admin${path}`
 
 function fmt(n: number) {
   return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n)
@@ -84,6 +85,7 @@ function Badge({ label, color }: { label: string; color: string }) {
     yellow: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
     gray:   'bg-gray-500/15 text-gray-400 border-gray-500/30',
     blue:   'bg-blue-500/15 text-blue-400 border-blue-500/30',
+    purple: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
   }
   return (
     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${colors[color] || colors.gray}`}>
@@ -166,31 +168,31 @@ function DashboardTab({ setTab }: { setTab: (t: Tab) => void }) {
       <div>
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-4">Users</h2>
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <StatCard label="Total Users"       value={fmt(stats.users.total)}            icon={<Users size={20}/>}         accent="blue"         onClick={() => setTab('users')} />
-          <StatCard label="Customers"         value={fmt(stats.users.customers)}        icon={<Users size={20}/>}         accent="blue"         onClick={() => setTab('users')} />
-          <StatCard label="Venue Owners"      value={fmt(stats.users.venue_owners)}     icon={<Users size={20}/>}         accent="purple"         onClick={() => setTab('venue-owners')} />
-          <StatCard label="Pending Approvals" value={fmt(stats.users.pending_approvals)} icon={<Clock size={20}/>}        accent="yellow" sub="action needed"         onClick={() => setTab('venue-owners')} />
-          <StatCard label="Banned"            value={fmt(stats.users.banned)}           icon={<Ban size={20}/>}           accent="red"         onClick={() => setTab('users')} />
+          <StatCard label="Total Users"       value={fmt(stats.users.total)}             icon={<Users size={20}/>}    accent="blue"   onClick={() => setTab('users')} />
+          <StatCard label="Customers"         value={fmt(stats.users.customers)}         icon={<Users size={20}/>}    accent="blue"   onClick={() => setTab('users')} />
+          <StatCard label="Venue Owners"      value={fmt(stats.users.venue_owners)}      icon={<Users size={20}/>}    accent="purple" onClick={() => setTab('venue-owners')} />
+          <StatCard label="Pending Approvals" value={fmt(stats.users.pending_approvals)} icon={<Clock size={20}/>}    accent="yellow" sub="action needed" onClick={() => setTab('venue-owners')} />
+          <StatCard label="Banned"            value={fmt(stats.users.banned)}            icon={<Ban size={20}/>}      accent="red"    onClick={() => setTab('users')} />
         </div>
       </div>
 
       <div>
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-4">Events</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="Total Events"  value={fmt(stats.events.total)}    icon={<CalendarDays size={20}/>} accent="blue" onClick={() => setTab('events')} />
-          <StatCard label="Pending"       value={fmt(stats.events.pending)}  icon={<Clock size={20}/>}        accent="yellow" sub="needs review" onClick={() => setTab('events')} />
-          <StatCard label="Approved"      value={fmt(stats.events.approved)} icon={<CheckCircle2 size={20}/>} accent="green" onClick={() => setTab('events')} />
-          <StatCard label="Flagged"       value={fmt(stats.events.flagged)}  icon={<Flag size={20}/>}         accent="red" onClick={() => setTab('events')} />
+          <StatCard label="Total Events" value={fmt(stats.events.total)}    icon={<CalendarDays size={20}/>}  accent="blue"   onClick={() => setTab('events')} />
+          <StatCard label="Pending"      value={fmt(stats.events.pending)}  icon={<Clock size={20}/>}         accent="yellow" sub="needs review" onClick={() => setTab('events')} />
+          <StatCard label="Approved"     value={fmt(stats.events.approved)} icon={<CheckCircle2 size={20}/>}  accent="green"  onClick={() => setTab('events')} />
+          <StatCard label="Flagged"      value={fmt(stats.events.flagged)}  icon={<Flag size={20}/>}          accent="red"    onClick={() => setTab('events')} />
         </div>
       </div>
 
       <div>
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-4">Revenue & Bookings</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="Total Revenue"   value={fmtCurrency(stats.revenue.total)}        icon={<DollarSign size={20}/>}  accent="green" onClick={() => setTab('revenue')} />
-          <StatCard label="Last 7 Days"     value={fmtCurrency(stats.revenue.last_7_days)}  icon={<TrendingUp size={20}/>}  accent="green" onClick={() => setTab('revenue')} />
-          <StatCard label="Total Bookings"  value={fmt(stats.bookings.total)}               icon={<Ticket size={20}/>}      accent="blue" onClick={() => setTab('bookings')} />
-          <StatCard label="Cancelled"       value={fmt(stats.bookings.cancelled)}           icon={<XCircle size={20}/>}     accent="red" onClick={() => setTab('bookings')} />
+          <StatCard label="Total Revenue"    value={fmtCurrency(stats.revenue.total)}       icon={<DollarSign size={20}/>} accent="green" onClick={() => setTab('revenue')} />
+          <StatCard label="Last 7 Days"      value={fmtCurrency(stats.revenue.last_7_days)} icon={<TrendingUp size={20}/>} accent="green" onClick={() => setTab('revenue')} />
+          <StatCard label="Total Bookings"   value={fmt(stats.bookings.total)}              icon={<Ticket size={20}/>}     accent="blue"  onClick={() => setTab('bookings')} />
+          <StatCard label="Cancelled"        value={fmt(stats.bookings.cancelled)}          icon={<XCircle size={20}/>}    accent="red"   onClick={() => setTab('bookings')} />
         </div>
       </div>
 
@@ -236,12 +238,17 @@ function VenueOwnersTab() {
 
   return (
     <div>
-      <AnimatePresence>{confirm && <ConfirmModal message={confirm.msg} onConfirm={(v) => {
-                          if (confirm.actionWithReason) confirm.actionWithReason(v)
-                          else confirm.action?.()
-                        }} onCancel={() => setConfirm(null)} extraInput={confirm.input} />}</AnimatePresence>
+      <AnimatePresence>
+        {confirm && (
+          <ConfirmModal
+            message={confirm.msg}
+            onConfirm={(v) => { if (confirm.actionWithReason) confirm.actionWithReason(v); else confirm.action?.() }}
+            onCancel={() => setConfirm(null)}
+            extraInput={confirm.input}
+          />
+        )}
+      </AnimatePresence>
 
-      {/* Filter tabs */}
       <div className="flex gap-2 mb-6">
         {filters.map(f => (
           <button key={f} onClick={() => setFilter(f)}
@@ -297,7 +304,7 @@ function VenueOwnersTab() {
 // ─── Tab: All Users ───────────────────────────────────────────────────────────
 
 function UsersTab() {
-  const [users, setUsers]   = useState<any[]>([])
+  const [users, setUsers]     = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [confirm, setConfirm] = useState<{ msg: string; action?: () => void; actionWithReason?: (v?: string) => void; input?: string } | null>(null)
 
@@ -315,10 +322,16 @@ function UsersTab() {
 
   return (
     <div>
-      <AnimatePresence>{confirm && <ConfirmModal message={confirm.msg} onConfirm={(v) => {
-                                      if (confirm.actionWithReason) confirm.actionWithReason(v)
-                                      else confirm.action?.()
-                                    }} onCancel={() => setConfirm(null)} extraInput={confirm.input} />}</AnimatePresence>
+      <AnimatePresence>
+        {confirm && (
+          <ConfirmModal
+            message={confirm.msg}
+            onConfirm={(v) => { if (confirm.actionWithReason) confirm.actionWithReason(v); else confirm.action?.() }}
+            onCancel={() => setConfirm(null)}
+            extraInput={confirm.input}
+          />
+        )}
+      </AnimatePresence>
 
       {loading ? <Loader /> : users.length === 0 ? <Empty text="No users" /> : (
         <div className="space-y-2">
@@ -355,8 +368,8 @@ function UsersTab() {
 // ─── Tab: Events ──────────────────────────────────────────────────────────────
 
 function EventsTab() {
-  const [events, setEvents]  = useState<any[]>([])
-  const [filter, setFilter]  = useState<'all' | 'pending' | 'approved' | 'flagged' | 'removed'>('pending')
+  const [events, setEvents]   = useState<any[]>([])
+  const [filter, setFilter]   = useState<'all' | 'pending' | 'approved' | 'flagged' | 'removed'>('pending')
   const [loading, setLoading] = useState(true)
   const [confirm, setConfirm] = useState<{ msg: string; action?: () => void; actionWithReason?: (v?: string) => void; input?: string } | null>(null)
 
@@ -379,10 +392,16 @@ function EventsTab() {
 
   return (
     <div>
-      <AnimatePresence>{confirm && <ConfirmModal message={confirm.msg} onConfirm={(v) => {
-                                                                                            if (confirm.actionWithReason) confirm.actionWithReason(v)
-                                                                                            else confirm.action?.()
-                                                                                          }} onCancel={() => setConfirm(null)} extraInput={confirm.input} />}</AnimatePresence>
+      <AnimatePresence>
+        {confirm && (
+          <ConfirmModal
+            message={confirm.msg}
+            onConfirm={(v) => { if (confirm.actionWithReason) confirm.actionWithReason(v); else confirm.action?.() }}
+            onCancel={() => setConfirm(null)}
+            extraInput={confirm.input}
+          />
+        )}
+      </AnimatePresence>
 
       <div className="flex gap-2 mb-6 flex-wrap">
         {(['pending', 'approved', 'flagged', 'removed', 'all'] as const).map(f => (
@@ -438,24 +457,29 @@ function EventsTab() {
 // ─── Tab: Shows ───────────────────────────────────────────────────────────────
 
 function ShowsTab() {
-  const [shows, setShows]   = useState<any[]>([])
+  const [shows, setShows]     = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [confirm, setConfirm] = useState<{ msg: string; action: () => void } | null>(null)
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true)
     apiClient.get(api('/shows/')).then(r => setShows(r.data)).finally(() => setLoading(false))
-  }
-  useEffect(() => { load() }, [])
+  }, [])
 
-  const act = async (showId: number, action: string, show_time?: string) => {
-    await apiClient.post(api(`/shows/${showId}/`), { action, show_time })
+  useEffect(() => { load() }, [load])
+
+  const act = async (showId: number, action: string) => {
+    await apiClient.post(api(`/shows/${showId}/`), { action })
     load(); setConfirm(null)
   }
 
   return (
     <div>
-      <AnimatePresence>{confirm && <ConfirmModal message={confirm.msg} onConfirm={() => confirm.action()} onCancel={() => setConfirm(null)} />}</AnimatePresence>
+      <AnimatePresence>
+        {confirm && (
+          <ConfirmModal message={confirm.msg} onConfirm={() => confirm.action()} onCancel={() => setConfirm(null)} />
+        )}
+      </AnimatePresence>
 
       {loading ? <Loader /> : shows.length === 0 ? <Empty text="No shows" /> : (
         <div className="space-y-2">
@@ -510,7 +534,11 @@ function BookingsTab() {
 
   return (
     <div>
-      <AnimatePresence>{confirm && <ConfirmModal message={confirm.msg} onConfirm={() => confirm.action()} onCancel={() => setConfirm(null)} />}</AnimatePresence>
+      <AnimatePresence>
+        {confirm && (
+          <ConfirmModal message={confirm.msg} onConfirm={() => confirm.action()} onCancel={() => setConfirm(null)} />
+        )}
+      </AnimatePresence>
 
       <div className="flex gap-2 mb-6">
         {(['all', 'Booked', 'Cancelled'] as const).map(f => (
@@ -551,7 +579,7 @@ function BookingsTab() {
 // ─── Tab: Revenue ─────────────────────────────────────────────────────────────
 
 function RevenueTab() {
-  const [data, setData]     = useState<any>(null)
+  const [data, setData]       = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -564,8 +592,8 @@ function RevenueTab() {
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard label="Total Revenue"     value={fmtCurrency(data.total_revenue)} icon={<DollarSign size={20}/>} accent="green" />
-        <StatCard label="Cancelled Bookings" value={fmt(data.cancelled_count)}      icon={<XCircle size={20}/>}   accent="red" />
+        <StatCard label="Total Revenue"      value={fmtCurrency(data.total_revenue)} icon={<DollarSign size={20}/>} accent="green" />
+        <StatCard label="Cancelled Bookings" value={fmt(data.cancelled_count)}       icon={<XCircle size={20}/>}   accent="red" />
       </div>
 
       <div>
@@ -608,7 +636,7 @@ function RevenueTab() {
 // ─── Tab: Fraud ───────────────────────────────────────────────────────────────
 
 function FraudTab() {
-  const [data, setData]     = useState<any>(null)
+  const [data, setData]       = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -621,46 +649,43 @@ function FraudTab() {
   const Section = ({ title, items, cols }: { title: string; items: any[]; cols: string[] }) => (
     <div>
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-3">{title}</h3>
-      {items.length === 0
-        ? (
-          <p className="text-gray-600 text-sm py-4 text-center border border-dashed border-gray-800 rounded-xl">
-            No suspicious activity detected ✓
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {items.map((item: any, i: number) => (
-              <div key={i} className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl px-5 py-3 flex items-center justify-between gap-4">
-                <p className="text-yellow-300 text-sm font-medium truncate">{item['user__email']}</p>
-                <div className="flex items-center gap-4 shrink-0">
-                  {cols.map(c => (
-                    <div key={c} className="text-right">
-                      <p className="text-yellow-400 font-bold text-sm">{item[c]}</p>
-                      <p className="text-yellow-600 text-xs">{c.replace(/_/g, ' ')}</p>
-                    </div>
-                  ))}
-                  {/* Quick Ban button — avoids having to switch to Users tab */}
-                  <ActionBtn
-                    label="Ban"
-                    icon={<Ban size={12}/>}
-                    variant="danger"
-                    onClick={async () => {
-                      if (!window.confirm(`Ban ${item['user__email']} for suspicious activity?`)) return
-                      try {
-                        await apiClient.post(api(`/users/${item['user__id']}/`), {
-                          action: 'ban',
-                          reason: 'Suspicious booking activity detected by fraud monitoring',
-                        })
-                      } catch {
-                        alert('Failed to ban user. Check Users tab.')
-                      }
-                    }}
-                  />
-                </div>
+      {items.length === 0 ? (
+        <p className="text-gray-600 text-sm py-4 text-center border border-dashed border-gray-800 rounded-xl">
+          No suspicious activity detected ✓
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {items.map((item: any, i: number) => (
+            <div key={i} className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl px-5 py-3 flex items-center justify-between gap-4">
+              <p className="text-yellow-300 text-sm font-medium truncate">{item['user__email']}</p>
+              <div className="flex items-center gap-4 shrink-0">
+                {cols.map(c => (
+                  <div key={c} className="text-right">
+                    <p className="text-yellow-400 font-bold text-sm">{item[c]}</p>
+                    <p className="text-yellow-600 text-xs">{c.replace(/_/g, ' ')}</p>
+                  </div>
+                ))}
+                <ActionBtn
+                  label="Ban"
+                  icon={<Ban size={12}/>}
+                  variant="danger"
+                  onClick={async () => {
+                    if (!window.confirm(`Ban ${item['user__email']} for suspicious activity?`)) return
+                    try {
+                      await apiClient.post(api(`/users/${item['user__id']}/`), {
+                        action: 'ban',
+                        reason: 'Suspicious booking activity detected by fraud monitoring',
+                      })
+                    } catch {
+                      alert('Failed to ban user. Check Users tab.')
+                    }
+                  }}
+                />
               </div>
-            ))}
-          </div>
-        )
-      }
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 
@@ -668,11 +693,14 @@ function FraudTab() {
     <div className="space-y-8">
       <div className="border border-yellow-500/20 bg-yellow-500/5 rounded-xl p-5 flex gap-3">
         <AlertTriangle className="text-yellow-400 shrink-0 mt-0.5" size={18} />
-        <p className="text-yellow-400/80 text-sm">Fraud monitoring checks for unusual booking patterns, rapid repeat bookings, and high cancellation rates. Review flagged users and take action from the Users tab.</p>
+        <p className="text-yellow-400/80 text-sm">
+          Fraud monitoring checks for unusual booking patterns, rapid repeat bookings, and high cancellation rates.
+          Review flagged users and take action from the Users tab.
+        </p>
       </div>
-      <Section title="5+ Bookings in Last 24 Hours" items={data.suspicious_24h} cols={['count']} />
-      <Section title="3+ Bookings in Last 1 Hour (Rapid)" items={data.rapid_bookings} cols={['count']} />
-      <Section title="High Cancellation Rate" items={data.high_cancel_rate} cols={['total', 'cancelled']} />
+      <Section title="5+ Bookings in Last 24 Hours"       items={data.suspicious_24h}  cols={['count']} />
+      <Section title="3+ Bookings in Last 1 Hour (Rapid)" items={data.rapid_bookings}  cols={['count']} />
+      <Section title="High Cancellation Rate"             items={data.high_cancel_rate} cols={['total', 'cancelled']} />
     </div>
   )
 }
@@ -685,11 +713,12 @@ function NotificationsTab() {
   const [sending, setSending] = useState(false)
   const [form, setForm]       = useState({ title: '', message: '', type: 'announcement', target: 'all' })
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true)
     apiClient.get(api('/notifications/')).then(r => setNotifs(r.data)).finally(() => setLoading(false))
-  }
-  useEffect(() => { load() }, [])
+  }, [])
+
+  useEffect(() => { load() }, [load])
 
   const send = async () => {
     if (!form.title || !form.message) return
@@ -716,24 +745,23 @@ function NotificationsTab() {
 
   return (
     <div className="space-y-8">
-      {/* Compose */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-        <h3 className="text-white font-bold mb-5 flex items-center gap-2"><Bell size={16} className="text-red-400"/> Send Platform Notification</h3>
+        <h3 className="text-white font-bold mb-5 flex items-center gap-2">
+          <Bell size={16} className="text-red-400"/> Send Platform Notification
+        </h3>
         <div className="space-y-4">
           <input value={form.title} onChange={e => setForm({...form, title: e.target.value})}
             placeholder="Notification title" className={inputCls} />
           <textarea value={form.message} onChange={e => setForm({...form, message: e.target.value})}
             placeholder="Message..." rows={3} className={`${inputCls} resize-none`} />
           <div className="grid grid-cols-2 gap-4">
-            <select value={form.type} onChange={e => setForm({...form, type: e.target.value})}
-              className={inputCls}>
+            <select value={form.type} onChange={e => setForm({...form, type: e.target.value})} className={inputCls}>
               <option value="announcement">Announcement</option>
               <option value="alert">Alert</option>
               <option value="maintenance">Maintenance</option>
               <option value="event">Event Alert</option>
             </select>
-            <select value={form.target} onChange={e => setForm({...form, target: e.target.value})}
-              className={inputCls}>
+            <select value={form.target} onChange={e => setForm({...form, target: e.target.value})} className={inputCls}>
               <option value="all">All Users</option>
               <option value="customers">Customers Only</option>
               <option value="venue_owners">Venue Owners Only</option>
@@ -742,12 +770,11 @@ function NotificationsTab() {
           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
             onClick={send} disabled={sending || !form.title || !form.message}
             className="flex items-center gap-2 px-6 py-2.5 bg-red-600 text-white rounded-xl font-semibold text-sm hover:bg-red-500 transition disabled:opacity-50">
-            <Send size={14} />{sending ? 'Sending...' : 'Send Notification'}
+            <Send size={14}/>{sending ? 'Sending...' : 'Send Notification'}
           </motion.button>
         </div>
       </div>
 
-      {/* History */}
       <div>
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-4">Sent Notifications</h3>
         {loading ? <Loader /> : notifs.length === 0 ? <Empty text="No notifications sent yet" /> : (
@@ -796,29 +823,43 @@ function Empty({ text }: { text: string }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: 'dashboard',    label: 'Dashboard',    icon: <LayoutDashboard size={16}/> },
-  { id: 'venue-owners', label: 'Venue Owners', icon: <UserCheck size={16}/> },
-  { id: 'users',        label: 'Customers',    icon: <Users size={16}/> },
-  { id: 'events',       label: 'Events',       icon: <CalendarDays size={16}/> },
-  { id: 'shows',        label: 'Shows',        icon: <Play size={16}/> },
-  { id: 'bookings',     label: 'Bookings',     icon: <Ticket size={16}/> },
-  { id: 'revenue',      label: 'Revenue',      icon: <BarChart3 size={16}/> },
-  { id: 'fraud',        label: 'Fraud',        icon: <ShieldAlert size={16}/> },
-  { id: 'notifications',label: 'Notify',       icon: <Bell size={16}/> },
+  { id: 'dashboard',     label: 'Dashboard',    icon: <LayoutDashboard size={16}/> },
+  { id: 'venue-owners',  label: 'Venue Owners', icon: <UserCheck size={16}/> },
+  { id: 'users',         label: 'Customers',    icon: <Users size={16}/> },
+  { id: 'events',        label: 'Events',        icon: <CalendarDays size={16}/> },
+  { id: 'shows',         label: 'Shows',         icon: <Play size={16}/> },
+  { id: 'bookings',      label: 'Bookings',      icon: <Ticket size={16}/> },
+  { id: 'revenue',       label: 'Revenue',       icon: <BarChart3 size={16}/> },
+  { id: 'fraud',         label: 'Fraud',         icon: <ShieldAlert size={16}/> },
+  { id: 'notifications', label: 'Notify',        icon: <Bell size={16}/> },
 ]
 
 export default function AdminPanelPage() {
-  const router   = useRouter()
+  const router        = useRouter()
   const [user, setUser] = useState<any>(null)
   const [tab, setTab]   = useState<Tab>('dashboard')
 
+  // ✅ Fixed: read auth from cookie via /api/auth/me, not localStorage
   useEffect(() => {
-    const u = localStorage.getItem('user')
-    if (!u) { router.push('/login'); return }
-    const parsed = JSON.parse(u)
-    if (parsed.role !== 'Admin') { router.push('/'); return }
-    setUser(parsed)
+    fetch('/api/auth/me')
+      .then(res => {
+        if (!res.ok) { router.push('/login'); return null }
+        return res.json()
+      })
+      .then(parsed => {
+        if (!parsed) return
+        if (parsed.role !== 'Admin') { router.push('/'); return }
+        setUser(parsed)
+      })
+      .catch(() => router.push('/login'))
   }, [])
+
+  // ✅ Fixed: use proper logout endpoint instead of wiping localStorage
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    router.push('/login')
+    window.dispatchEvent(new Event('authChange'))
+  }
 
   if (!user) return (
     <div className="min-h-screen bg-[#080810] flex items-center justify-center">
@@ -843,13 +884,11 @@ export default function AdminPanelPage() {
 
       {/* Sidebar */}
       <div className="w-56 shrink-0 border-r border-white/[0.06] bg-[#0b0b14] flex flex-col">
-        {/* Brand */}
         <div className="px-5 py-6 border-b border-white/[0.06]">
           <p className="text-white font-bold text-lg tracking-tight">TicketFlix</p>
           <p className="text-red-500 text-[10px] font-semibold tracking-widest uppercase mt-0.5">Admin Panel</p>
         </div>
 
-        {/* Nav */}
         <nav className="flex-1 py-4 px-3 space-y-0.5 overflow-y-auto">
           {TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
@@ -863,12 +902,14 @@ export default function AdminPanelPage() {
           ))}
         </nav>
 
-        {/* User info */}
         <div className="px-4 py-4 border-t border-white/[0.06]">
-          <p className="text-white text-xs font-medium truncate">{user.first_name || user.email}</p>
+          <p className="text-white text-xs font-medium truncate">{user.first_name || 'Admin'}</p>
           <p className="text-red-500 text-[10px]">Administrator</p>
-          <button onClick={() => { localStorage.clear(); router.push('/login') }}
-            className="flex items-center gap-1.5 text-gray-600 hover:text-gray-400 text-xs mt-2 transition">
+          {/* ✅ Fixed: proper logout, no localStorage.clear() */}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 text-gray-600 hover:text-gray-400 text-xs mt-2 transition"
+          >
             <LogOut size={11}/> Sign out
           </button>
         </div>
@@ -877,31 +918,31 @@ export default function AdminPanelPage() {
       {/* Main content */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-6xl mx-auto px-6 py-8">
-
-          {/* Page header */}
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-white capitalize">
               {TABS.find(t => t.id === tab)?.label}
             </h1>
             <p className="text-gray-600 text-sm mt-0.5">
-              {tab === 'dashboard'    && 'Platform overview and key metrics'}
-              {tab === 'venue-owners' && 'Approve, reject or ban venue owner accounts'}
-              {tab === 'users'        && 'Manage all customers'}
-              {tab === 'events'       && 'Moderate and approve events before publishing'}
-              {tab === 'shows'        && 'Cancel or modify show timings'}
-              {tab === 'bookings'     && 'View and manage all bookings'}
-              {tab === 'revenue'      && 'Platform revenue and transaction analytics'}
-              {tab === 'fraud'        && 'Detect suspicious booking patterns'}
-              {tab === 'notifications'&& 'Send platform-wide announcements'}
+              {tab === 'dashboard'     && 'Platform overview and key metrics'}
+              {tab === 'venue-owners'  && 'Approve, reject or ban venue owner accounts'}
+              {tab === 'users'         && 'Manage all customers'}
+              {tab === 'events'        && 'Moderate and approve events before publishing'}
+              {tab === 'shows'         && 'Cancel or modify show timings'}
+              {tab === 'bookings'      && 'View and manage all bookings'}
+              {tab === 'revenue'       && 'Platform revenue and transaction analytics'}
+              {tab === 'fraud'         && 'Detect suspicious booking patterns'}
+              {tab === 'notifications' && 'Send platform-wide announcements'}
             </p>
           </div>
 
           <AnimatePresence mode="wait">
-            <motion.div key={tab}
+            <motion.div
+              key={tab}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.15 }}>
+              transition={{ duration: 0.15 }}
+            >
               {tabContent[tab]}
             </motion.div>
           </AnimatePresence>
