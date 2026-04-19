@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const DJANGO =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
-  'https://web-production-cf420.up.railway.app/api'
+  'https://ticketflix-backend-cpy1.onrender.com/api'
 
 async function handler(
   req: NextRequest,
