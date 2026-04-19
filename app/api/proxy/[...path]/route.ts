@@ -2,37 +2,39 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const DJANGO =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
-  'https://ticketflix-backend-cpy1.onrender.com/api'
+  'https://ticketflix-backend-cpy1.onrender.com'
 
 async function handler(
   req: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
+  { params }: { params: { path: string[] } }
 ) {
-  const { path } = await params
+  const pathStr = params.path.join('/')
   const token = req.cookies.get('authToken')?.value
 
-  // ✅ Always append trailing slash — Django requires it
-  const pathStr = path.join('/')
-  const url = `${DJANGO}/${pathStr}/${req.nextUrl.search}`
-  //                                 ↑ added
+  const url = `${DJANGO}/${pathStr}/${req.nextUrl.search || ''}`
 
-  const contentType = req.headers.get('Content-Type') || 'application/json'
-  const headers: Record<string, string> = { 'Content-Type': contentType }
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const body = req.method !== 'GET' && req.method !== 'HEAD'
-    ? await req.text()
-    : undefined
+  const body =
+    req.method !== 'GET' && req.method !== 'HEAD'
+      ? await req.text()
+      : undefined
 
   try {
     const res = await fetch(url, { method: req.method, headers, body })
     const data = await res.text()
+
     return new NextResponse(data, {
       status: res.status,
-      headers: { 'Content-Type': res.headers.get('Content-Type') || 'application/json' },
+      headers: {
+        'Content-Type': res.headers.get('Content-Type') || 'application/json',
+      },
     })
   } catch (err) {
-    console.error(`[proxy] Failed to reach backend at ${url}:`, err)
     return NextResponse.json(
       { error: 'Backend unreachable', detail: String(err) },
       { status: 503 }
