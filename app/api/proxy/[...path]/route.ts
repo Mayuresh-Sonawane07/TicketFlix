@@ -8,37 +8,58 @@ async function handler(
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
-  const { path } = await params   // ← this is the fix
+  const { path } = await params
   const pathStr = path.join('/')
   const token = req.cookies.get('authToken')?.value
   const search = req.nextUrl.search || ''
-
   const url = `${DJANGO}/${pathStr}/${search}`
 
   const headers: Record<string, string> = {}
   if (token) headers['Authorization'] = `Bearer ${token}`
 
   const contentType = req.headers.get('content-type') || ''
-  if (contentType && !contentType.includes('multipart/form-data')) {
-    headers['Content-Type'] = contentType
+  const isMultipart = contentType.includes('multipart/form-data')
+
+  // For multipart: forward the content-type WITH boundary intact
+  // For everything else: forward as-is
+  if (contentType) {
+    headers['Content-Type'] = contentType  // ← always forward, including multipart+boundary
   }
 
-  let body: Buffer | undefined
+  let body: BodyInit | undefined
   if (req.method !== 'GET' && req.method !== 'HEAD') {
-    const ab = await req.arrayBuffer()
-    body = Buffer.from(ab)
+    if (isMultipart) {
+      // Stream the body directly — buffering can corrupt multipart boundaries
+      body = req.body ?? undefined
+    } else {
+      const ab = await req.arrayBuffer()
+      body = Buffer.from(ab)
+    }
   }
 
   try {
-    const res = await fetch(url, { method: req.method, headers, body })
+    const res = await fetch(url, {
+      method: req.method,
+      headers,
+      body,
+      // Required for streaming body in Node.js fetch
+      // @ts-ignore
+      duplex: 'half',
+    })
+
     const responseData = await res.arrayBuffer()
     return new NextResponse(responseData, {
       status: res.status,
-      headers: { 'Content-Type': res.headers.get('content-type') || 'application/json' },
+      headers: {
+        'Content-Type': res.headers.get('content-type') || 'application/json',
+      },
     })
   } catch (err) {
     console.error('[proxy] error:', err)
-    return NextResponse.json({ error: 'Backend unreachable', detail: String(err) }, { status: 503 })
+    return NextResponse.json(
+      { error: 'Backend unreachable', detail: String(err) },
+      { status: 503 }
+    )
   }
 }
 
