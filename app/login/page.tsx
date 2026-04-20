@@ -37,7 +37,10 @@ export default function Login() {
   const handleLoginSuccess = (user: any) => {
     window.dispatchEvent(new Event('authChange'))
     if (user.role === 'Admin') router.push('/admin-panel')
-    else if (user.role === 'VENUE_OWNER') router.push('/venue-dashboard')
+    else if (user.role === 'VENUE_OWNER') {
+      if (user.is_approved) router.push('/venue-dashboard')
+      else router.push('/?notice=pending_approval')
+    }
     else router.push('/')
   }
 

@@ -10,31 +10,41 @@ async function handler(
 ) {
   const pathStr = params.path.join('/')
   const token = req.cookies.get('authToken')?.value
+  const search = req.nextUrl.search || ''
+  const url = `${DJANGO}/${pathStr}/${search}`
 
-  const url = `${DJANGO}/${pathStr}/${req.nextUrl.search || ''}`
+  console.log(`[proxy] ${req.method} ${url} | auth: ${!!token}`)
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-
+  const headers: Record<string, string> = {}
   if (token) headers['Authorization'] = `Bearer ${token}`
+
+  const contentType = req.headers.get('Content-Type') || ''
+  if (contentType && !contentType.includes('multipart/form-data')) {
+    headers['Content-Type'] = contentType
+  }
 
   const body =
     req.method !== 'GET' && req.method !== 'HEAD'
-      ? await req.text()
+      ? await req.arrayBuffer()
       : undefined
 
   try {
-    const res = await fetch(url, { method: req.method, headers, body })
-    const data = await res.text()
+    const res = await fetch(url, {
+      method: req.method,
+      headers,
+      body: body ? Buffer.from(body) : undefined,
+    })
 
-    return new NextResponse(data, {
+    const responseBody = await res.arrayBuffer()
+
+    return new NextResponse(responseBody, {
       status: res.status,
       headers: {
         'Content-Type': res.headers.get('Content-Type') || 'application/json',
       },
     })
   } catch (err) {
+    console.error('[proxy] error:', err)
     return NextResponse.json(
       { error: 'Backend unreachable', detail: String(err) },
       { status: 503 }
@@ -42,4 +52,11 @@ async function handler(
   }
 }
 
-export { handler as GET, handler as POST, handler as PUT, handler as PATCH, handler as DELETE }
+export {
+  handler as GET,
+  handler as POST,
+  handler as PUT,
+  handler as PATCH,
+  handler as DELETE,
+  handler as OPTIONS,
+}
