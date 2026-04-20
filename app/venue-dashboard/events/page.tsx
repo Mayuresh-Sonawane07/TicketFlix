@@ -135,6 +135,7 @@ export default function MyEventsPage() {
       // Refresh shows if expanded
       if (expandedShows.has(selectedEvent.id)) {
         fetchShowsForEvent(selectedEvent.id)
+        setExpandedShows(prev => new Set(prev).add(selectedEvent.id))
       }
     } catch (err: any) {
       const data = err.response?.data
@@ -182,15 +183,21 @@ export default function MyEventsPage() {
   }
 
   const handleCancelShow = async (show: any) => {
-    if (!confirm(`Cancel show on ${new Date(show.show_time).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}? This cannot be undone.`)) return
+    if (!confirm(
+      `Cancel show on ${new Date(show.show_time).toLocaleString('en-IN', {
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      })}? This cannot be undone.`
+    )) return
     setCancellingShow(show.id)
+    const eventId = show.event
     try {
       await showAPI.delete(show.id)
-      const eventId = show.event
       setEventShows(prev => ({
         ...prev,
         [eventId]: (prev[eventId] || []).filter(s => s.id !== show.id)
       }))
+      fetchShowsForEvent(eventId) 
     } catch {
       alert('Failed to cancel show. It may have existing bookings.')
     } finally {
