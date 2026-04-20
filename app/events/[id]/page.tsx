@@ -9,7 +9,7 @@ import { apiClient, Show, Event } from '@/lib/api'
 import { ArrowLeft, Clock, Globe, Tag, Calendar, MapPin, Star, Trash2, Send } from 'lucide-react'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') ||
-  'https://ticketflix-backend-cpy1.onrender.com/api'
+  'https://ticketflix-backend-cpyl.onrender.com/api'
 
 function getImageUrl(image?: string): string | null {
   if (!image) return null
