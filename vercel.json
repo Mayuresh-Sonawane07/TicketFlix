@@ -1,10 +1,4 @@
 {
-  "rewrites": [
-    {
-      "source": "/api/proxy/:path*",
-      "destination": "https://ticketflix-backend-cpyl.onrender.com/api/:path*/"
-    }
-  ],
   "headers": [
     {
       "source": "/(.*)",
