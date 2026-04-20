@@ -11,36 +11,43 @@ async function handler(
   const pathStr = params.path.join('/')
   const token = req.cookies.get('authToken')?.value
   const search = req.nextUrl.search || ''
+
+  // Always add trailing slash for Django
   const url = `${DJANGO}/${pathStr}/${search}`
 
   console.log(`[proxy] ${req.method} ${url} | auth: ${!!token}`)
 
   const headers: Record<string, string> = {}
-  if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const contentType = req.headers.get('Content-Type') || ''
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  // Forward content-type but not for multipart (let fetch set boundary automatically)
+  const contentType = req.headers.get('content-type') || ''
   if (contentType && !contentType.includes('multipart/form-data')) {
     headers['Content-Type'] = contentType
   }
 
-  const body =
-    req.method !== 'GET' && req.method !== 'HEAD'
-      ? await req.arrayBuffer()
-      : undefined
+  let body: Buffer | undefined
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    const ab = await req.arrayBuffer()
+    body = Buffer.from(ab)
+  }
 
   try {
     const res = await fetch(url, {
       method: req.method,
       headers,
-      body: body ? Buffer.from(body) : undefined,
+      body,
     })
 
-    const responseBody = await res.arrayBuffer()
+    const responseData = await res.arrayBuffer()
 
-    return new NextResponse(responseBody, {
+    return new NextResponse(responseData, {
       status: res.status,
       headers: {
-        'Content-Type': res.headers.get('Content-Type') || 'application/json',
+        'Content-Type': res.headers.get('content-type') || 'application/json',
       },
     })
   } catch (err) {
