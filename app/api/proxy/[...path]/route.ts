@@ -6,24 +6,18 @@ const DJANGO =
 
 async function handler(
   req: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
-  const pathStr = params.path.join('/')
+  const { path } = await params   // ← this is the fix
+  const pathStr = path.join('/')
   const token = req.cookies.get('authToken')?.value
   const search = req.nextUrl.search || ''
 
-  // Always add trailing slash for Django
   const url = `${DJANGO}/${pathStr}/${search}`
 
-  console.log(`[proxy] ${req.method} ${url} | auth: ${!!token}`)
-
   const headers: Record<string, string> = {}
+  if (token) headers['Authorization'] = `Bearer ${token}`
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-
-  // Forward content-type but not for multipart (let fetch set boundary automatically)
   const contentType = req.headers.get('content-type') || ''
   if (contentType && !contentType.includes('multipart/form-data')) {
     headers['Content-Type'] = contentType
@@ -36,34 +30,16 @@ async function handler(
   }
 
   try {
-    const res = await fetch(url, {
-      method: req.method,
-      headers,
-      body,
-    })
-
+    const res = await fetch(url, { method: req.method, headers, body })
     const responseData = await res.arrayBuffer()
-
     return new NextResponse(responseData, {
       status: res.status,
-      headers: {
-        'Content-Type': res.headers.get('content-type') || 'application/json',
-      },
+      headers: { 'Content-Type': res.headers.get('content-type') || 'application/json' },
     })
   } catch (err) {
     console.error('[proxy] error:', err)
-    return NextResponse.json(
-      { error: 'Backend unreachable', detail: String(err) },
-      { status: 503 }
-    )
+    return NextResponse.json({ error: 'Backend unreachable', detail: String(err) }, { status: 503 })
   }
 }
 
-export {
-  handler as GET,
-  handler as POST,
-  handler as PUT,
-  handler as PATCH,
-  handler as DELETE,
-  handler as OPTIONS,
-}
+export { handler as GET, handler as POST, handler as PUT, handler as PATCH, handler as DELETE, handler as OPTIONS }
