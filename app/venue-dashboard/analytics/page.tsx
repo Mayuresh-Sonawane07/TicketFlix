@@ -100,7 +100,10 @@ export default function AnalyticsPage() {
 
   // Top events by bookings
   const topEvents = events.map(event => {
-    const eventBookings = bookings.filter(b => b.show === event.id || b.show_details?.event === event.id)
+    const eventBookings = bookings.filter(b => {
+      const eventId = b.show_details?.event
+      return eventId && Number(eventId) === Number(event.id)
+    })
     const revenue = eventBookings
       .filter(b => b.status === 'Booked')
       .reduce((sum, b) => sum + Number(b.total_amount), 0)
