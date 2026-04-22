@@ -17,6 +17,15 @@ function getImageUrl(image?: string): string | null {
   return `${API_BASE}/media/${image}`
 }
 
+function getYouTubeEmbed(url?: string) {
+  if (!url) return null
+
+  const regExp = /(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/;
+  const match = url.match(regExp)
+
+  return match ? `https://www.youtube.com/embed/${match[1]}` : null
+}
+
 interface Review {
   id: number
   user: number
@@ -66,6 +75,7 @@ export default function EventDetailPage() {
   const [reviews, setReviews] = useState<Review[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const trailerEmbed = getYouTubeEmbed(event?.trailer_url)
 
   const [rating, setRating] = useState(0)
   const [comment, setComment] = useState('')
@@ -205,6 +215,22 @@ export default function EventDetailPage() {
           </div>
         </div>
       </div>
+
+      {trailerEmbed && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+          <div className="aspect-video rounded-xl overflow-hidden border border-gray-800">
+            <iframe
+              src={trailerEmbed}
+              title="Trailer"
+              loading="lazy"
+              sandbox="allow-same-origin allow-scripts allow-presentation"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="w-full h-full"
+            />
+          </div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">

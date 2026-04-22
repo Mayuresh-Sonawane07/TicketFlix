@@ -28,6 +28,7 @@ export default function EditEventPage() {
     language: '',
     genre: '',
     release_date: '',
+    trailer_url: '',
   })
 
   useEffect(() => {
@@ -45,6 +46,7 @@ export default function EditEventPage() {
             language: event.language || '',
             genre: event.genre || '',
             release_date: event.release_date || '',
+            trailer_url: event.trailer_url || '',
           })
           if (event.image) {
             setImagePreview(
@@ -149,6 +151,20 @@ export default function EditEventPage() {
               <input id="image-upload" type="file" accept="image/*"
                 onChange={handleImageChange} className="hidden" />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              YouTube Trailer (optional)
+            </label>
+            <input
+              name="trailer_url"
+              type="url"
+              value={form.trailer_url}
+              onChange={handleChange}
+              placeholder="https://www.youtube.com/watch?v=..."
+              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
+            />
           </div>
 
           {/* Title */}

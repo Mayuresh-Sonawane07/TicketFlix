@@ -22,6 +22,7 @@ export default function CreateEventPage() {
     language: '',
     genre: '',
     release_date: '',
+    trailer_url: '',
   })
   const [imageFile, setImageFile] = useState<File | null>(null)
 
@@ -128,6 +129,20 @@ export default function CreateEventPage() {
                 className="hidden"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              YouTube Trailer (optional)
+            </label>
+            <input
+              name="trailer_url"
+              type="url"
+              value={form.trailer_url}
+              onChange={handleChange}
+              placeholder="https://www.youtube.com/watch?v=..."
+              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
+            />
           </div>
 
           {/* Title */}

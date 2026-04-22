@@ -17,6 +17,15 @@ function getImageUrl(image?: string): string | null {
   return `${API_BASE}/media/${image}`
 }
 
+function getYouTubeEmbed(url?: string) {
+  if (!url) return null
+
+  const regExp = /(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/;
+  const match = url.match(regExp)
+
+  return match ? `https://www.youtube.com/embed/${match[1]}` : null
+}
+
 export default function MyEventsPage() {
   const router = useRouter()
   const [events, setEvents] = useState<Event[]>([])
