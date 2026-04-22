@@ -109,7 +109,10 @@ export interface Booking {
   booking_time: string
   user: number
   show: number
-  seats: number[]
+  seats: {
+    seat_number: string
+    category: string
+  }[]
 }
 
 export interface Theater {

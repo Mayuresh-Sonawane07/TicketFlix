@@ -42,7 +42,8 @@ async function handler(
       method: req.method,
       headers,
       body,
-      // Required for streaming body in Node.js fetch
+      cache: 'no-store',          // 🔥 VERY IMPORTANT
+      next: { revalidate: 0 },    // 🔥 disable Next.js caching
       // @ts-ignore
       duplex: 'half',
     })
@@ -52,6 +53,7 @@ async function handler(
       status: res.status,
       headers: {
         'Content-Type': res.headers.get('content-type') || 'application/json',
+        'Cache-Control': 'no-store',   // 🔥 prevents browser caching
       },
     })
   } catch (err) {
