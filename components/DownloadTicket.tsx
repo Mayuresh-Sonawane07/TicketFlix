@@ -11,7 +11,8 @@ export default function DownloadTicket({ booking }: { booking: any }) {
     setGenerating(true)
     try {
       const show    = booking.show_details
-      const event   = show?.event
+      const event = show?.event || {}
+      const posterUrl = event?.image || booking?.event_image || null
 
       const ticket  = {
         bookingId:     booking.id,
@@ -59,11 +60,12 @@ export default function DownloadTicket({ booking }: { booking: any }) {
 
       // ── Poster (FIXED) ─────────────────────
       let posterHeight = 0
-      if (event?.image) {
+      if (posterUrl) {
         try {
           const img = new Image()
           img.crossOrigin = "anonymous"
-          img.src = event.image
+          img.src = posterUrl
+          img.referrerPolicy = "no-referrer"
 
           await new Promise((resolve) => {
             img.onload = resolve
@@ -151,7 +153,7 @@ export default function DownloadTicket({ booking }: { booking: any }) {
 
       const colW = (cardW - 20) / 3
       const stats = [
-        { label: 'SEATS', value: ticket.seats.length.toString() },
+        { label: 'SEATS', value: ticket.seats.map((s: any) => s.seat_number || s).join(', ') },
         { label: 'AMOUNT', value: `₹${Number(ticket.totalAmount).toLocaleString('en-IN')}` },
         { label: 'STATUS', value: ticket.status },
       ]
