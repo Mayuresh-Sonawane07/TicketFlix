@@ -111,7 +111,13 @@ function SeatBtn({
         w-9 h-9 rounded-lg border-2 text-[10px] font-bold transition-all duration-150 shrink-0
         ${seat.is_booked
           ? 'bg-white/[0.03] border-white/[0.07] text-white/10 cursor-not-allowed'
-          : selected ? styles.selected : styles.available}
+          : selected
+            ? styles.selected
+            : seat.demand === 'high'
+              ? 'bg-red-500/40 border-red-500 text-red-300 animate-pulse'
+              : seat.demand === 'medium'
+                ? 'bg-yellow-500/30 border-yellow-500 text-yellow-300'
+                : styles.available}
       `}
     >
       {seat.is_booked
@@ -498,6 +504,15 @@ export default function SeatSelectionPage() {
               <span className="text-gray-600 text-xs">{label}</span>
             </div>
           ))}
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-red-500/30 rounded" />
+            <span className="text-gray-300">High Demand</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-yellow-500/20 rounded" />
+            <span className="text-gray-300">Medium Demand</span>
+          </div>
         </div>
 
       </div>
