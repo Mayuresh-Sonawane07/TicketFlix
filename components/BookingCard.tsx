@@ -3,6 +3,7 @@
 import { Booking } from '@/lib/api'
 import { motion } from 'framer-motion'
 import { Trash2, CheckCircle, XCircle } from 'lucide-react'
+import DownloadTicket from '@/components/DownloadTicket'
 
 interface BookingCardProps {
   booking: Booking
@@ -16,7 +17,7 @@ export default function BookingCard({
   isLoading = false,
 }: BookingCardProps) {
   const bookingDate = new Date(booking.booking_time)
-  const isCancelled = booking.status === 'cancelled'
+  const isCancelled = booking.status.toLowerCase() === 'cancelled'
 
   return (
     <motion.div
@@ -63,16 +64,24 @@ export default function BookingCard({
       </div>
 
       {!isCancelled && (
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => onCancel(booking.id)}
-          disabled={isLoading}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-600/10 border border-red-600/30 text-red-600 rounded-lg hover:bg-red-600/20 hover:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Trash2 size={16} />
-          {isLoading ? 'Cancelling...' : 'Cancel Booking'}
-        </motion.button>
+        <div className="flex gap-2">
+
+          {/* 🎟️ DOWNLOAD BUTTON */}
+          <DownloadTicket booking={booking} />
+
+          {/* ❌ CANCEL BUTTON */}
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => onCancel(booking.id)}
+            disabled={isLoading}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600/10 border border-red-600/30 text-red-600 rounded-lg hover:bg-red-600/20 hover:border-red-600/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Trash2 size={16} />
+            {isLoading ? 'Cancelling...' : 'Cancel'}
+          </motion.button>
+
+        </div>
       )}
     </motion.div>
   )
