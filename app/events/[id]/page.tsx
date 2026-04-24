@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { apiClient, Show, Event } from '@/lib/api'
-import { ArrowLeft, Clock, Globe, Tag, Calendar, MapPin, Star, Trash2, Send } from 'lucide-react'
+import { ArrowLeft, Clock, Globe, Tag, Calendar, MapPin, Star, Trash2, Send, Volume2, VolumeX } from 'lucide-react'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') ||
   'https://ticketflix-backend-cpyl.onrender.com/api'
@@ -19,11 +19,9 @@ function getImageUrl(image?: string): string | null {
 
 function getYouTubeEmbed(url?: string) {
   if (!url) return null
-
-  const regExp = /(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/;
+  const regExp = /(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/
   const match = url.match(regExp)
-
-  return match ? `https://www.youtube.com/embed/${match[1]}` : null
+  return match ? match[1] : null
 }
 
 interface Review {
@@ -75,7 +73,9 @@ export default function EventDetailPage() {
   const [reviews, setReviews] = useState<Review[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const trailerEmbed = getYouTubeEmbed(event?.trailer_url)
+
+  const [muted, setMuted] = useState(true)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
 
   const [rating, setRating] = useState(0)
   const [comment, setComment] = useState('')
@@ -85,13 +85,19 @@ export default function EventDetailPage() {
   const [userReview, setUserReview] = useState<Review | null>(null)
   const [deleting, setDeleting] = useState(false)
 
+  const videoId = getYouTubeEmbed(event?.trailer_url)
+
+  // Build the autoplay+mute iframe src. We re-key the iframe when mute toggles
+  // because YouTube's JS API is tricky — easiest to reload with new param.
+  const trailerSrc = videoId
+    ? `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=${muted ? 1 : 0}&loop=1&playlist=${videoId}&controls=0&showinfo=0&rel=0&modestbranding=1&iv_load_policy=3&disablekb=1&playsinline=1`
+    : null
+
   useEffect(() => {
-    // ✅ Fixed: use /api/auth/me instead of localStorage
     fetch('/api/auth/me')
       .then(res => res.ok ? res.json() : null)
       .then(user => { if (user) setCurrentUser(user) })
       .catch(() => {})
-
     fetchData()
   }, [id])
 
@@ -177,25 +183,69 @@ export default function EventDetailPage() {
 
   return (
     <div className="min-h-screen bg-black">
-      {/* Hero */}
-      <div className="relative h-96 w-full bg-gray-900">
-        {imageUrl ? (
-          <Image src={imageUrl} alt={event.title} fill className="object-cover opacity-60" />
+
+      {/* ── Hero ── */}
+      <div className="relative h-[520px] w-full overflow-hidden bg-gray-950">
+
+        {/* Video background — shown when trailer exists */}
+        {trailerSrc ? (
+          <>
+            {/* pointer-events-none prevents clicking the iframe (no pause/controls) */}
+            <iframe
+              key={`yt-${muted}`}          // re-mount on mute toggle
+              ref={iframeRef}
+              src={trailerSrc}
+              title="Trailer background"
+              allow="autoplay; encrypted-media"
+              className="absolute inset-0 w-full h-full pointer-events-none"
+              style={{
+                // Scale up so the 16:9 video fully covers the hero (letterbox removal)
+                transform: 'scale(1.5)',
+                transformOrigin: 'center center',
+              }}
+            />
+            {/* Gradient overlays so text stays readable */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/20 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-transparent pointer-events-none" />
+
+            {/* Mute / Unmute button */}
+            <button
+              onClick={() => setMuted(v => !v)}
+              className="absolute bottom-6 right-6 z-20 flex items-center gap-2 px-3 py-2 rounded-full bg-black/60 border border-white/20 text-white text-xs font-medium backdrop-blur-sm hover:bg-black/80 hover:border-white/40 transition-all"
+              aria-label={muted ? 'Unmute trailer' : 'Mute trailer'}
+            >
+              {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+              {muted ? 'Unmute' : 'Mute'}
+            </button>
+          </>
+        ) : imageUrl ? (
+          /* Fallback: static poster if no trailer */
+          <>
+            <Image src={imageUrl} alt={event.title} fill className="object-cover opacity-60" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+          </>
         ) : (
-          <div className="flex items-center justify-center h-full text-8xl">
-            {event.event_type === 'MOVIE' ? '🎬' :
-              event.event_type === 'CONCERT' ? '🎵' :
-                event.event_type === 'SPORTS' ? '⚽' : '🎪'}
-          </div>
+          /* Fallback: emoji placeholder */
+          <>
+            <div className="flex items-center justify-center h-full text-8xl">
+              {event.event_type === 'MOVIE' ? '🎬' :
+                event.event_type === 'CONCERT' ? '🎵' :
+                  event.event_type === 'SPORTS' ? '⚽' : '🎪'}
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+          </>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+
+        {/* Back button */}
         <button
           onClick={() => router.back()}
-          className="absolute top-6 left-6 flex items-center gap-2 text-white hover:text-red-400 transition"
+          className="absolute top-6 left-6 z-10 flex items-center gap-2 text-white hover:text-red-400 transition"
         >
           <ArrowLeft size={20} /> Back
         </button>
-        <div className="absolute bottom-0 left-0 right-0 p-8">
+
+        {/* Title / meta — pinned to bottom of hero */}
+        <div className="absolute bottom-0 left-0 right-0 p-8 z-10">
           <div className="max-w-7xl mx-auto">
             <span className="px-3 py-1 bg-red-600 text-white text-xs rounded-full mb-3 inline-block">
               {event.event_type}
@@ -216,22 +266,7 @@ export default function EventDetailPage() {
         </div>
       </div>
 
-      {trailerEmbed && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
-          <div className="aspect-video rounded-xl overflow-hidden border border-gray-800">
-            <iframe
-              src={trailerEmbed}
-              title="Trailer"
-              loading="lazy"
-              sandbox="allow-same-origin allow-scripts allow-presentation"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="w-full h-full"
-            />
-          </div>
-        </div>
-      )}
-
+      {/* ── Body ── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
 
