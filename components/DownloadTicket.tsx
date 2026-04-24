@@ -9,238 +9,238 @@ export default function DownloadTicket({ booking }: { booking: any }) {
 
   const generatePDF = async () => {
     setGenerating(true)
-    try {
-      const show    = booking.show_details
-      const event = show?.event || {}
-      const posterUrl = event?.image || booking?.event_image || null
 
-      const ticket  = {
-        bookingId:     booking.id,
-        eventTitle:    event?.title        || `Show #${booking.show}`,
-        eventType:     event?.event_type   || 'EVENT',
-        showTime:      show?.show_time     || '',
-        theaterName:   show?.theater_name  || 'Venue',
-        screenNumber:  show?.screen_number || '',
-        seats:         booking.seats       || [],
-        totalAmount:   booking.total_amount,
-        status:        booking.status,
-        bookingTime:   booking.booking_time,
-        transactionId: booking.transaction_id || '',
-        qrBase64:      booking.qr_code_base64 || '',
+    try {
+      const show = booking.show_details || {}
+      const event = show?.event || {}
+
+      const ticket = {
+        bookingId: booking.id,
+        eventTitle: event?.title || 'Untitled Event',
+        eventType: event?.event_type || 'EVENT',
+        posterUrl: event?.image,
+
+        showTime: show?.show_time,
+        theaterName: show?.theater_name,
+        screenNumber: show?.screen_number,
+
+        seats: booking.seats || [],
+        totalAmount: booking.total_amount,
+        status: booking.status,
+        bookingTime: booking.booking_time,
+        transactionId: booking.transaction_id,
+
+        qrBase64: booking.qr_code_base64,
       }
 
       const { jsPDF } = await import('jspdf')
-      const W = 210, H = 297
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const doc = new jsPDF({ unit: 'mm', format: 'a4' })
 
-      // ── Background ─────────────────────────
-      doc.setFillColor(8, 8, 12)
+      const W = 210
+      const H = 297
+
+      // 🌈 BACKGROUND (Neon Gradient Feel)
+      doc.setFillColor(15, 10, 35)
       doc.rect(0, 0, W, H, 'F')
 
-      // grid pattern
-      doc.setDrawColor(18, 18, 28)
-      doc.setLineWidth(0.15)
-      for (let i = 0; i < H; i += 8) doc.line(0, i, W, i)
-      for (let i = 0; i < W; i += 8) doc.line(i, 0, i, H)
-
-      // ── Card ───────────────────────────────
-      const cardX = 12, cardY = 14, cardW = W - 24, cardH = H - 28
-
-      doc.setFillColor(220, 38, 38)
-      doc.setGState(doc.GState({ opacity: 0.08 }))
-      doc.roundedRect(cardX - 1, cardY - 1, cardW + 2, cardH + 2, 6, 6, 'F')
-
+      doc.setFillColor(60, 0, 120)
+      doc.setGState(doc.GState({ opacity: 0.4 }))
+      doc.rect(0, 0, W, 120, 'F')
       doc.setGState(doc.GState({ opacity: 1 }))
-      doc.setFillColor(13, 13, 20)
-      doc.roundedRect(cardX, cardY, cardW, cardH, 5, 5, 'F')
 
-      doc.setDrawColor(35, 35, 52)
-      doc.setLineWidth(0.4)
-      doc.roundedRect(cardX, cardY, cardW, cardH, 5, 5, 'S')
+      // 💎 GLASS CARD
+      const cardX = 8
+      const cardY = 8
+      const cardW = W - 16
+      const cardH = H - 16
 
-      // ── Poster (FIXED) ─────────────────────
-      let posterHeight = 0
-      if (posterUrl) {
+      doc.setFillColor(255, 255, 255)
+      doc.setGState(doc.GState({ opacity: 0.08 }))
+      doc.roundedRect(cardX, cardY, cardW, cardH, 8, 8, 'F')
+      doc.setGState(doc.GState({ opacity: 1 }))
+
+      doc.setDrawColor(255, 255, 255)
+      doc.setGState(doc.GState({ opacity: 0.2 }))
+      doc.roundedRect(cardX, cardY, cardW, cardH, 8, 8, 'S')
+      doc.setGState(doc.GState({ opacity: 1 }))
+
+      let y = cardY + 5
+
+      // 🎬 POSTER (CINEMATIC)
+      if (ticket.posterUrl) {
         try {
           const img = new Image()
-          img.crossOrigin = "anonymous"
-          img.src = posterUrl
-          img.referrerPolicy = "no-referrer"
+          img.crossOrigin = 'anonymous'
+          img.src = ticket.posterUrl
 
-          await new Promise((resolve) => {
-            img.onload = resolve
-          })
+          await new Promise((res) => (img.onload = res))
 
-          doc.addImage(img, 'JPEG', cardX, cardY, cardW, 50)
-          posterHeight = 50
+          doc.addImage(img, 'JPEG', cardX, y, cardW, 80)
+
+          // gradient overlay bottom
+          doc.setFillColor(0, 0, 0)
+          doc.setGState(doc.GState({ opacity: 0.6 }))
+          doc.rect(cardX, y + 45, cardW, 35, 'F')
+          doc.setGState(doc.GState({ opacity: 1 }))
+
+          y += 85
         } catch {
-          console.log('Image failed')
+          y += 10
         }
       }
 
-      // ── Header (below poster) ──────────────
-      const hdrH = 42
-      const hdrY = cardY + posterHeight
-
-      doc.setFillColor(220, 38, 38)
-      doc.rect(cardX, hdrY, cardW, hdrH, 'F')
-
-      // glow effect
-      doc.setFillColor(255, 80, 80)
-      doc.setGState(doc.GState({ opacity: 0.15 }))
-      doc.circle(cardX + cardW - 30, hdrY + 20, 30, 'F')
-      doc.setGState(doc.GState({ opacity: 1 }))
-
-      // header text
-      doc.setTextColor(255, 255, 255)
-      doc.setFontSize(22)
+      // 🎟️ TITLE (NEON WHITE)
       doc.setFont('helvetica', 'bold')
-      doc.text('TicketFlix', cardX + 10, hdrY + 16)
-
-      doc.setFontSize(8)
-      doc.setTextColor(255, 190, 190)
-      doc.text('Premium Booking Ticket', cardX + 10, hdrY + 26)
-
-      doc.setFontSize(11)
-      doc.setTextColor(255, 255, 255)
-      doc.text(`Booking #${ticket.bookingId}`, cardX + cardW - 10, hdrY + 14, { align: 'right' })
-
-      // status badge
-      const isConfirmed = ticket.status === 'Booked'
-      doc.setFillColor(isConfirmed ? 22 : 220, isConfirmed ? 163 : 38, isConfirmed ? 74 : 38)
-      doc.roundedRect(cardX + cardW - 38, hdrY + 24, 28, 8, 2, 2, 'F')
-
-      doc.setFontSize(7)
-      doc.setTextColor(255, 255, 255)
-      doc.text(ticket.status.toUpperCase(), cardX + cardW - 24, hdrY + 30, { align: 'center' })
-
-      // ── Event Section ──────────────────────
-      let y = hdrY + hdrH + 10
-
-      doc.setFillColor(220, 38, 38)
-      doc.roundedRect(cardX + 10, y, 26, 6.5, 1.5, 1.5, 'F')
-
-      doc.setFontSize(6.5)
-      doc.setTextColor(255, 255, 255)
-      doc.text(ticket.eventType.toUpperCase(), cardX + 23, y + 4.5, { align: 'center' })
-
-      y += 12
-
       doc.setFontSize(24)
       doc.setTextColor(255, 255, 255)
       doc.text(ticket.eventTitle, cardX + 10, y)
 
-      y += 10
+      y += 8
 
-      if (ticket.showTime) {
-        doc.setFontSize(10)
-        doc.setTextColor(200, 200, 220)
-        doc.text(
-          new Date(ticket.showTime).toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short' }),
-          cardX + 10, y
-        )
-        y += 10
-      }
+      // TYPE CHIP
+      doc.setFillColor(255, 0, 120)
+      doc.roundedRect(cardX + 10, y, 28, 7, 3, 3, 'F')
 
-      // venue
-      const venueStr = `${ticket.theaterName}\nScreen ${ticket.screenNumber || '-'}`
-      doc.setFontSize(9.5)
-      doc.setTextColor(140, 140, 165)
-      doc.text(doc.splitTextToSize(venueStr, cardW - 20), cardX + 10, y)
+      doc.setFontSize(9)
+      doc.setTextColor(255, 255, 255)
+      doc.text(ticket.eventType, cardX + 24, y + 4.5, { align: 'center' })
 
-      // ── Stats ──────────────────────────────
+      y += 14
+
+      // 📅 DATE
+      const formattedDate = ticket.showTime
+        ? new Date(ticket.showTime).toLocaleString('en-IN', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+            hour: 'numeric',
+            minute: '2-digit',
+          })
+        : '-'
+
+      doc.setFontSize(11)
+      doc.setTextColor(200, 200, 255)
+      doc.text(`📅 ${formattedDate}`, cardX + 10, y)
+
+      y += 8
+
+      // 📍 VENUE
+      doc.text(
+        `📍 ${ticket.theaterName} • Screen ${ticket.screenNumber}`,
+        cardX + 10,
+        y
+      )
+
+      y += 12
+
+      // 🎫 SEATS (GLASS BOX)
+      doc.setFillColor(255, 255, 255)
+      doc.setGState(doc.GState({ opacity: 0.06 }))
+      doc.roundedRect(cardX + 10, y, cardW - 20, 25, 4, 4, 'F')
+      doc.setGState(doc.GState({ opacity: 1 }))
+
+      const grouped: any = {}
+      ticket.seats.forEach((s: any) => {
+        const cat = s.category || 'Other'
+        if (!grouped[cat]) grouped[cat] = []
+        grouped[cat].push(s.seat_number)
+      })
+
+      let seatY = y + 7
+
+      doc.setFontSize(10)
+      doc.setTextColor(255, 255, 255)
+      doc.text('Seats', cardX + 15, seatY)
+
+      seatY += 6
+
+      Object.entries(grouped).forEach(([cat, seats]: any) => {
+        doc.setFontSize(9)
+        doc.setTextColor(180, 180, 255)
+        doc.text(`${cat}: ${seats.join(', ')}`, cardX + 15, seatY)
+        seatY += 5
+      })
+
+      y += 32
+
+      // 💰 PAYMENT CARD
+      doc.setFillColor(255, 0, 120)
+      doc.setGState(doc.GState({ opacity: 0.15 }))
+      doc.roundedRect(cardX + 10, y, cardW - 20, 22, 4, 4, 'F')
+      doc.setGState(doc.GState({ opacity: 1 }))
+
+      doc.setFontSize(12)
+      doc.setTextColor(255, 255, 255)
+      doc.text(
+        `₹${Number(ticket.totalAmount).toFixed(2)}`,
+        cardX + 15,
+        y + 8
+      )
+
+      doc.setFontSize(9)
+      doc.text(
+        `Txn: ${ticket.transactionId || '-'}`,
+        cardX + 15,
+        y + 16
+      )
+
+      y += 30
+
+      // 🟢 STATUS CHIP
+      const status =
+        ticket.status === 'Booked' ? 'CONFIRMED' : ticket.status
+
+      doc.setFillColor(34, 197, 94)
+      doc.roundedRect(cardX + 10, y, 40, 9, 3, 3, 'F')
+
+      doc.setFontSize(10)
+      doc.setTextColor(255, 255, 255)
+      doc.text(status, cardX + 30, y + 6, { align: 'center' })
+
       y += 18
 
-      const colW = (cardW - 20) / 3
-      const stats = [
-        { label: 'SEATS', value: ticket.seats.map((s: any) => s.seat_number || s).join(', ') },
-        { label: 'AMOUNT', value: `₹${Number(ticket.totalAmount).toLocaleString('en-IN')}` },
-        { label: 'STATUS', value: ticket.status },
-      ]
-
-      stats.forEach((col, i) => {
-        const cx = cardX + 10 + i * colW
-
-        doc.setFillColor(20, 20, 32)
-        doc.roundedRect(cx, y, colW - 4, 20, 3, 3, 'F')
-
-        doc.setFontSize(6.5)
-        doc.setTextColor(100, 100, 130)
-        doc.text(col.label, cx + (colW - 4) / 2, y + 6, { align: 'center' })
-
-        doc.setFontSize(11)
-        doc.setTextColor(255, 255, 255)
-        doc.text(col.value, cx + (colW - 4) / 2, y + 14, { align: 'center' })
-      })
-
-      // ── QR ─────────────────────────────────
-      const qrSize = 52
+      // 🔳 QR (CENTER FOCUS)
+      const qrSize = 55
       const qrX = W / 2 - qrSize / 2
-      const qrY = y + 30
 
       doc.setFillColor(255, 255, 255)
-      doc.roundedRect(qrX - 5, qrY - 5, qrSize + 10, qrSize + 18, 4, 4, 'F')
+      doc.roundedRect(qrX - 6, y - 6, qrSize + 12, qrSize + 12, 5, 5, 'F')
 
       if (ticket.qrBase64) {
-        const raw = ticket.qrBase64.replace(/^data:image\/png;base64,/, '')
-        doc.addImage(raw, 'PNG', qrX, qrY, qrSize, qrSize)
+        const raw = ticket.qrBase64.replace(
+          /^data:image\/png;base64,/,
+          ''
+        )
+        doc.addImage(raw, 'PNG', qrX, y, qrSize, qrSize)
       }
 
-      doc.setFontSize(7)
-      doc.setTextColor(100, 100, 100)
-      doc.text('Scan at Entry', W / 2, qrY + qrSize + 5, { align: 'center' })
+      y += qrSize + 8
 
-      // ── Seat Details (SAFE) ────────────────
-      const groupedSeats = ticket.seats.reduce((acc: any, s: any) => {
-        const cat = s?.category || 'Other'
-        const seat = s?.seat_number || s
-        if (!acc[cat]) acc[cat] = []
-        acc[cat].push(seat)
-        return acc
-      }, {})
+      doc.setFontSize(10)
+      doc.setTextColor(180, 180, 200)
+      doc.text('Scan for Entry', W / 2, y, { align: 'center' })
 
-      let sY = qrY + qrSize + 20
+      y += 8
 
-      doc.setFontSize(7)
-      doc.setTextColor(120, 120, 150)
-      doc.text('SEAT DETAILS', W / 2, sY, { align: 'center' })
+      if (ticket.bookingTime) {
+        const bt = new Date(ticket.bookingTime).toLocaleString('en-IN')
+        doc.setFontSize(8)
+        doc.text(`Booked: ${bt}`, W / 2, y, { align: 'center' })
+      }
 
-      sY += 8
-
-      Object.entries(groupedSeats).forEach(([cat, seats]: any) => {
-        doc.setFontSize(8.5)
-        doc.setTextColor(220, 220, 255)
-        doc.text(`${cat}: ${seats.join(', ')}`, W / 2, sY, { align: 'center' })
-        sY += 6
-      })
-
-      // ── Premium Strip ──────────────────────
-      doc.setFillColor(220, 38, 38)
-      doc.rect(cardX, cardY + cardH - 22, cardW, 3, 'F')
-
-      doc.setFillColor(255, 120, 0)
-      doc.rect(cardX, cardY + cardH - 19, cardW, 2, 'F')
-
-      // ── Footer ─────────────────────────────
-      const ftY = cardY + cardH - 14
-
-      doc.setFontSize(8)
-      doc.setTextColor(120, 120, 150)
-      doc.text('Powered by TicketFlix • Premium Booking Experience', W / 2, ftY, { align: 'center' })
-
-      doc.setFontSize(7)
-      doc.setTextColor(80, 80, 100)
-      doc.text('Valid only for this show • Non-transferable', W / 2, ftY + 6, { align: 'center' })
-
-      doc.setFontSize(8)
-      doc.setTextColor(220, 38, 38)
+      // 🔗 FOOTER (CLICKABLE)
+      doc.setTextColor(120, 180, 255)
+      doc.setFontSize(9)
       doc.textWithLink(
-        'https://ticketflix-ten.vercel.app',
+        'ticketflix-ten.vercel.app',
         W / 2,
-        ftY + 12,
-        { url: 'https://ticketflix-ten.vercel.app', align: 'center' }
+        H - 10,
+        {
+          url: 'https://ticketflix-ten.vercel.app',
+          align: 'center',
+        }
       )
-      
+
       doc.save(`TicketFlix-${ticket.bookingId}.pdf`)
     } catch (err) {
       console.error(err)
@@ -258,7 +258,7 @@ export default function DownloadTicket({ booking }: { booking: any }) {
       whileTap={{ scale: 0.95 }}
       onClick={generatePDF}
       disabled={generating}
-      className="flex items-center gap-1.5 px-3 py-1.5 border border-green-600/40 text-green-400 rounded-lg hover:bg-green-600/10 transition text-xs font-medium disabled:opacity-50"
+      className="flex items-center gap-1.5 px-3 py-1.5 border border-pink-500/40 text-pink-400 rounded-lg hover:bg-pink-500/10 transition text-xs font-medium disabled:opacity-50"
     >
       <Download size={13} />
       {generating ? 'Generating…' : 'Download Ticket'}
