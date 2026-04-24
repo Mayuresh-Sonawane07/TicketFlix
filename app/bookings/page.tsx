@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { bookingAPI, apiClient, Booking } from '@/lib/api'
 import { Ticket, CheckCircle, XCircle, Clock, Users, ChevronDown, ChevronUp, IndianRupee, Download } from 'lucide-react'
+import DownloadTicket from '@/components/DownloadTicket'
 
 function BookingsContent() {
   const router = useRouter()
@@ -424,15 +425,7 @@ function BookingsContent() {
                             {/* Action Buttons */}
                             {booking.status === 'Booked' && (
                               <div className="flex items-center gap-2 pt-3 border-t border-gray-700/50">
-                                <motion.button
-                                  whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                                  onClick={() => handleDownloadTicket(booking)}
-                                  disabled={generatingPDF === booking.id}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 border border-green-600/40 text-green-400 rounded-lg hover:bg-green-600/10 transition text-xs font-medium disabled:opacity-50"
-                                >
-                                  <Download size={12} />
-                                  {generatingPDF === booking.id ? 'Generating...' : 'Download Ticket'}
-                                </motion.button>
+                                <DownloadTicket booking={booking} />
                                 <motion.button
                                   whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                                   onClick={() => handleCancel(booking.id)}
