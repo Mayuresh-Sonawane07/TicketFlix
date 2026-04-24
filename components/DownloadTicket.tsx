@@ -43,30 +43,14 @@ export default function DownloadTicket({ booking }: { booking: any }) {
       doc.setFillColor(15, 10, 35)
       doc.rect(0, 0, W, H, 'F')
 
-      doc.setFillColor(60, 0, 120)
-      doc.setGState(doc.GState({ opacity: 0.4 }))
-      doc.rect(0, 0, W, 120, 'F')
-      doc.setGState(doc.GState({ opacity: 1 }))
-
       // 💎 Card
       const cardX = 8
       const cardY = 8
       const cardW = W - 16
-      const cardH = H - 16
-
-      doc.setFillColor(255, 255, 255)
-      doc.setGState(doc.GState({ opacity: 0.08 }))
-      doc.roundedRect(cardX, cardY, cardW, cardH, 8, 8, 'F')
-      doc.setGState(doc.GState({ opacity: 1 }))
-
-      doc.setDrawColor(255, 255, 255)
-      doc.setGState(doc.GState({ opacity: 0.2 }))
-      doc.roundedRect(cardX, cardY, cardW, cardH, 8, 8, 'S')
-      doc.setGState(doc.GState({ opacity: 1 }))
 
       let y = cardY + 5
 
-      // 🎬 Poster (fixed scaling + centered)
+      // 🎬 POSTER (NO STRETCH, NO CROP)
       if (ticket.posterUrl) {
         try {
           const img = new Image()
@@ -78,34 +62,49 @@ export default function DownloadTicket({ booking }: { booking: any }) {
           const imgProps = doc.getImageProperties(img)
           const ratio = imgProps.width / imgProps.height
 
-          const imgHeight = 70
-          const imgWidth = imgHeight * ratio
-          const imgX = cardX + (cardW - imgWidth) / 2
+          const bannerH = 75
+          let drawW = cardW
+          let drawH = bannerH
 
-          doc.addImage(img, 'JPEG', imgX, y, imgWidth, imgHeight)
+          if (ratio > cardW / bannerH) {
+            drawW = cardW
+            drawH = cardW / ratio
+          } else {
+            drawH = bannerH
+            drawW = bannerH * ratio
+          }
+
+          const imgX = cardX + (cardW - drawW) / 2
+          const imgY = y + (bannerH - drawH) / 2
+
+          // background
+          doc.setFillColor(30, 20, 60)
+          doc.rect(cardX, y, cardW, bannerH, 'F')
+
+          doc.addImage(img, 'JPEG', imgX, imgY, drawW, drawH)
 
           // overlay
           doc.setFillColor(0, 0, 0)
-          doc.setGState(doc.GState({ opacity: 0.5 }))
-          doc.rect(cardX, y + 45, cardW, 25, 'F')
+          doc.setGState(doc.GState({ opacity: 0.4 }))
+          doc.rect(cardX, y + bannerH - 20, cardW, 20, 'F')
           doc.setGState(doc.GState({ opacity: 1 }))
 
-          y += imgHeight + 10
+          y += bannerH + 10
         } catch {
           y += 10
         }
       }
 
-      // 🎟️ Title
+      // 🎟️ TITLE
       doc.setFont('helvetica', 'bold')
-      doc.setFontSize(22)
+      doc.setFontSize(20)
       doc.setTextColor(255, 255, 255)
 
       const titleLines = doc.splitTextToSize(ticket.eventTitle, cardW - 20)
       doc.text(titleLines, cardX + 10, y)
       y += titleLines.length * 6 + 6
 
-      // Event type
+      // TYPE
       doc.setFillColor(255, 0, 120)
       doc.roundedRect(cardX + 10, y, 28, 7, 3, 3, 'F')
 
@@ -115,7 +114,7 @@ export default function DownloadTicket({ booking }: { booking: any }) {
 
       y += 14
 
-      // 📅 Date
+      // DATE
       const formattedDate = ticket.showTime
         ? new Date(ticket.showTime).toLocaleString('en-IN', {
             weekday: 'short',
@@ -132,7 +131,7 @@ export default function DownloadTicket({ booking }: { booking: any }) {
 
       y += 8
 
-      // 📍 Venue
+      // VENUE
       doc.text(
         `Venue: ${ticket.theaterName} - Screen ${ticket.screenNumber}`,
         cardX + 10,
@@ -141,7 +140,7 @@ export default function DownloadTicket({ booking }: { booking: any }) {
 
       y += 12
 
-      // 🎫 Seats
+      // SEATS
       const grouped: any = {}
       ticket.seats.forEach((s: any) => {
         const cat = s.category || 'Other'
@@ -173,7 +172,7 @@ export default function DownloadTicket({ booking }: { booking: any }) {
 
       y += seatBoxHeight + 8
 
-      // 💰 Payment
+      // PAYMENT
       const paymentHeight = 22
 
       doc.setFillColor(255, 0, 120)
@@ -190,15 +189,11 @@ export default function DownloadTicket({ booking }: { booking: any }) {
       doc.text(amount, cardX + 15, y + 8)
 
       doc.setFontSize(9)
-      doc.text(
-        `Txn: ${ticket.transactionId || '-'}`,
-        cardX + 15,
-        y + 16
-      )
+      doc.text(`Txn: ${ticket.transactionId || '-'}`, cardX + 15, y + 16)
 
       y += paymentHeight + 10
 
-      // 🟢 Status
+      // STATUS
       const status =
         ticket.status === 'Booked' ? 'CONFIRMED' : ticket.status
 
@@ -209,14 +204,26 @@ export default function DownloadTicket({ booking }: { booking: any }) {
       doc.setTextColor(255, 255, 255)
       doc.text(status, cardX + 30, y + 6, { align: 'center' })
 
-      y += 20
+      y += 15
 
-      // 🔳 QR
+      // 🔳 PREMIUM QR CARD
       const qrSize = 55
       const qrX = W / 2 - qrSize / 2
 
+      // shadow (fake)
+      doc.setFillColor(0, 0, 0)
+      doc.setGState(doc.GState({ opacity: 0.2 }))
+      doc.roundedRect(qrX - 4, y - 2, qrSize + 8, qrSize + 8, 5, 5, 'F')
+      doc.setGState(doc.GState({ opacity: 1 }))
+
+      // white card
       doc.setFillColor(255, 255, 255)
-      doc.roundedRect(qrX - 6, y - 6, qrSize + 12, qrSize + 12, 5, 5, 'F')
+      doc.roundedRect(qrX - 6, y - 6, qrSize + 12, qrSize + 12, 6, 6, 'F')
+
+      // glow border
+      doc.setDrawColor(120, 180, 255)
+      doc.setLineWidth(0.5)
+      doc.roundedRect(qrX - 6, y - 6, qrSize + 12, qrSize + 12, 6, 6)
 
       if (ticket.qrBase64) {
         const raw = ticket.qrBase64.replace(
@@ -226,28 +233,25 @@ export default function DownloadTicket({ booking }: { booking: any }) {
         doc.addImage(raw, 'PNG', qrX, y, qrSize, qrSize)
       }
 
-      // 🔻 Footer (fixed)
-      const footerY = H - 15
+      // FOOTER
+      const footerY = H - 12
 
-      doc.setFontSize(10)
+      doc.setFontSize(9)
       doc.setTextColor(180, 180, 200)
       doc.text('Scan for Entry', W / 2, footerY - 8, { align: 'center' })
 
       if (ticket.bookingTime) {
         const bt = new Date(ticket.bookingTime).toLocaleString('en-IN')
         doc.setFontSize(8)
-        doc.text(`Booked: ${bt}`, W / 2, footerY - 3, { align: 'center' })
+        doc.text(`Booked: ${bt}`, W / 2, footerY - 4, { align: 'center' })
       }
 
       doc.setTextColor(120, 180, 255)
       doc.textWithLink(
         'ticketflix-ten.vercel.app',
         W / 2,
-        footerY + 3,
-        {
-          url: 'https://ticketflix-ten.vercel.app',
-          align: 'center',
-        }
+        footerY,
+        { url: 'https://ticketflix-ten.vercel.app', align: 'center' }
       )
 
       doc.save(`TicketFlix-${ticket.bookingId}.pdf`)
