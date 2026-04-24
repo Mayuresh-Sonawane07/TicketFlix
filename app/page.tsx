@@ -221,7 +221,7 @@ export default function Home() {
                 className="overflow-hidden mb-6"
               >
                 <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-6 space-y-6">
 
                     {/* Event Type */}
                     <div>
@@ -351,17 +351,17 @@ export default function Home() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.4 }}
-                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+                  className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-6 space-y-6"
                 >
                   <AnimatePresence mode="popLayout">
                     {filteredEvents.map((event) => (
                       <motion.div
                         key={event.id}
-                        layout
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ duration: 0.2 }}
+                        className="break-inside-avoid"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
                       >
                         <EventCard event={event} />
                       </motion.div>
