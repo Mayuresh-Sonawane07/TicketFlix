@@ -78,7 +78,7 @@ export default function AnalyticsPage() {
   const statusData = [{ name: 'Booked', value: confirmedBookings.length }, { name: 'Cancelled', value: cancelledBookings.length }, { name: 'Pending', value: pendingBookings.length }].filter(d => d.value > 0)
   const topEvents = events.map(event => {
     const eb = bookings.filter(b => {
-      const bookingEventId = b?.show_details?.event?.id
+      const bookingEventId = b?.show?.event?.id ?? b?.show_details?.event?.id
     
       if (!bookingEventId) return false
     
