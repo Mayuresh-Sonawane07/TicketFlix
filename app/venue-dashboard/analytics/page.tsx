@@ -78,22 +78,21 @@ export default function AnalyticsPage() {
   const statusData = [{ name: 'Booked', value: confirmedBookings.length }, { name: 'Cancelled', value: cancelledBookings.length }, { name: 'Pending', value: pendingBookings.length }].filter(d => d.value > 0)
   const topEvents = events.map(event => {
     const eb = bookings.filter(b => {
-      const bookingEventId = b?.show?.event?.id ?? b?.show_details?.event?.id
+      // Try show_details first, then fall back to injected event_id
+      const id =
+        b?.show_details?.event?.id ??
+        b?.event_id ??
+        null
     
-      if (!bookingEventId) return false
-    
-      return String(bookingEventId) === String(event.id)
+      if (!id) return false
+      return String(id) === String(event.id)
     })
   
     const rev = eb
       .filter(b => b.status === 'Booked')
       .reduce((s, b) => s + Number(b.total_amount), 0)
   
-    return {
-      ...event,
-      bookingCount: eb.length,
-      revenue: rev
-    }
+    return { ...event, bookingCount: eb.length, revenue: rev }
   })
   .sort((a, b) => b.bookingCount - a.bookingCount)
   .slice(0, 5)
