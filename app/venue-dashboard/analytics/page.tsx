@@ -49,6 +49,7 @@ export default function AnalyticsPage() {
       setEvents(Array.isArray(eventsData) ? eventsData : (eventsData as any).results ?? [])
       const bookingsData = bookingsRes.data
       setBookings(Array.isArray(bookingsData) ? bookingsData : bookingsData.results ?? [])
+      console.log("BOOKINGS DATA:", bookingsData)
     } catch {} finally { setLoading(false) }
   }
 
@@ -74,9 +75,14 @@ export default function AnalyticsPage() {
     return Object.entries(days).map(([day, count]) => ({ day, count }))
   }
 
-  const statusData = [{ name: 'Confirmed', value: confirmedBookings.length }, { name: 'Cancelled', value: cancelledBookings.length }, { name: 'Pending', value: pendingBookings.length }].filter(d => d.value > 0)
+  const statusData = [{ name: 'Booked', value: confirmedBookings.length }, { name: 'Cancelled', value: cancelledBookings.length }, { name: 'Pending', value: pendingBookings.length }].filter(d => d.value > 0)
   const topEvents = events.map(event => {
-    const eb = bookings.filter(b => Number(b.show_details?.event?.id) === Number(event.id))
+    const eb = bookings.filter(
+      b =>
+        b.show_details &&
+        b.show_details.event &&
+        Number(b.show_details.event.id) === Number(event.id)
+    )
     const rev = eb.filter(b => b.status === 'Booked').reduce((s, b) => s + Number(b.total_amount), 0)
     return { ...event, bookingCount: eb.length, revenue: rev }
   }).sort((a, b) => b.bookingCount - a.bookingCount).slice(0, 5)
@@ -175,7 +181,16 @@ export default function AnalyticsPage() {
             ) : (
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
-                  <Pie data={statusData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value">
+                  <Pie
+                    data={statusData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={4}
+                    dataKey="value"
+                    label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                  >
                     {statusData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
                   <Tooltip {...chartTooltipStyle} />
