@@ -77,15 +77,26 @@ export default function AnalyticsPage() {
 
   const statusData = [{ name: 'Booked', value: confirmedBookings.length }, { name: 'Cancelled', value: cancelledBookings.length }, { name: 'Pending', value: pendingBookings.length }].filter(d => d.value > 0)
   const topEvents = events.map(event => {
-    const eb = bookings.filter(
-      b =>
-        b.show_details &&
-        b.show_details.event &&
-        Number(b.show_details.event.id) === Number(event.id)
-    )
-    const rev = eb.filter(b => b.status === 'Booked').reduce((s, b) => s + Number(b.total_amount), 0)
-    return { ...event, bookingCount: eb.length, revenue: rev }
-  }).sort((a, b) => b.bookingCount - a.bookingCount).slice(0, 5)
+    const eb = bookings.filter(b => {
+      const bookingEventId = b?.show_details?.event?.id
+    
+      if (!bookingEventId) return false
+    
+      return String(bookingEventId) === String(event.id)
+    })
+  
+    const rev = eb
+      .filter(b => b.status === 'Booked')
+      .reduce((s, b) => s + Number(b.total_amount), 0)
+  
+    return {
+      ...event,
+      bookingCount: eb.length,
+      revenue: rev
+    }
+  })
+  .sort((a, b) => b.bookingCount - a.bookingCount)
+  .slice(0, 5)
 
   if (loading) return (
     <div className="min-h-screen bg-[#080808] flex items-center justify-center">
