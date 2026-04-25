@@ -2,282 +2,233 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { eventAPI } from '@/lib/api'
-import { Upload, ArrowLeft } from 'lucide-react'
+import { Upload, ArrowLeft, Sparkles, Film, Music, Trophy, PartyPopper, Check, Youtube, X } from 'lucide-react'
 import Link from 'next/link'
 
-const EVENT_TYPES = ['MOVIE', 'CONCERT', 'SPORTS', 'OTHER']
+const EVENT_TYPES = [
+  { value: 'MOVIE',   label: 'Movie',   icon: Film,         grad: 'from-red-600 to-orange-500',    glow: 'shadow-red-500/20' },
+  { value: 'CONCERT', label: 'Concert', icon: Music,        grad: 'from-violet-600 to-purple-500', glow: 'shadow-violet-500/20' },
+  { value: 'SPORTS',  label: 'Sports',  icon: Trophy,       grad: 'from-emerald-600 to-teal-500',  glow: 'shadow-emerald-500/20' },
+  { value: 'OTHER',   label: 'Other',   icon: PartyPopper,  grad: 'from-amber-500 to-yellow-400',  glow: 'shadow-amber-500/20' },
+]
+
+function FormField({ label, required, children, hint }: { label: string; required?: boolean; children: React.ReactNode; hint?: string }) {
+  return (
+    <div>
+      <label className="flex items-center gap-2 text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2">
+        {label}{required && <span className="text-red-500">*</span>}
+      </label>
+      {children}
+      {hint && <p className="text-gray-700 text-[10px] mt-1.5">{hint}</p>}
+    </div>
+  )
+}
+
+const inputCls = "w-full px-4 py-3.5 bg-white/3 border border-white/8 rounded-2xl text-white placeholder-gray-700 text-sm focus:outline-none focus:border-red-500/50 focus:bg-white/5 focus:shadow-lg focus:shadow-red-500/8 transition-all duration-200"
 
 export default function CreateEventPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    event_type: 'MOVIE',
-    duration: '',
-    language: '',
-    genre: '',
-    release_date: '',
-    trailer_url: '',
-  })
+  const [dragOver, setDragOver] = useState(false)
+  const [form, setForm] = useState({ title: '', description: '', event_type: 'MOVIE', duration: '', language: '', genre: '', release_date: '', trailer_url: '' })
   const [imageFile, setImageFile] = useState<File | null>(null)
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
-    setError('')
-  }
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => { setForm({ ...form, [e.target.name]: e.target.value }); setError('') }
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setImageFile(file)
-      setImagePreview(URL.createObjectURL(file))
-    }
+  const handleImageFile = (file: File) => { setImageFile(file); setImagePreview(URL.createObjectURL(file)) }
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (f) handleImageFile(f) }
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault(); setDragOver(false)
+    const f = e.dataTransfer.files?.[0]
+    if (f && f.type.startsWith('image/')) handleImageFile(f)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-
+    e.preventDefault(); setLoading(true); setError('')
     try {
-      const formData = new FormData()
-      Object.entries(form).forEach(([key, value]) => {
-        if (value) formData.append(key, value)
-      })
-      if (imageFile) formData.append('image', imageFile)
-
-      await eventAPI.create(formData)
+      const fd = new FormData()
+      Object.entries(form).forEach(([k, v]) => { if (v) fd.append(k, v) })
+      if (imageFile) fd.append('image', imageFile)
+      await eventAPI.create(fd)
       router.push('/venue-dashboard/events')
     } catch (err: any) {
       const data = err.response?.data
-      if (data) {
-        const messages = Object.values(data).flat()
-        setError(messages.join(' '))
-      } else {
-        setError('Failed to create event. Please try again.')
-      }
-    } finally {
-      setLoading(false)
-    }
+      setError(data ? Object.values(data).flat().join(' ') : 'Failed to create event.')
+    } finally { setLoading(false) }
   }
 
+  const selectedType = EVENT_TYPES.find(t => t.value === form.event_type)!
+
   return (
-    <div className="min-h-screen bg-black">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="min-h-screen bg-[#080808] overflow-hidden">
+      {/* Background */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <motion.div animate={{ x: [0, 20, 0], y: [0, -15, 0] }} transition={{ duration: 18, repeat: Infinity }}
+          className={`absolute top-0 right-1/4 w-[500px] h-[500px] rounded-full blur-[100px] transition-colors duration-700 ${form.event_type === 'MOVIE' ? 'bg-red-900/12' : form.event_type === 'CONCERT' ? 'bg-violet-900/12' : form.event_type === 'SPORTS' ? 'bg-emerald-900/12' : 'bg-amber-900/10'}`} />
+        <div className="absolute inset-0 opacity-[0.015]" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px)', backgroundSize: '44px 44px' }} />
+      </div>
+
+      <div className="relative z-10 max-w-2xl mx-auto px-4 sm:px-6 py-12">
 
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <Link
-            href="/venue-dashboard"
-            className="text-gray-400 hover:text-white transition"
-          >
-            <ArrowLeft size={24} />
-          </Link>
-          <div>
-            <h1 className="text-3xl font-bold text-white">Create Event</h1>
-            <p className="text-gray-400 text-sm mt-1">Fill in the details for your new event</p>
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="mb-10">
+          <div className="flex items-center gap-3 mb-4">
+            <Link href="/venue-dashboard">
+              <motion.div whileHover={{ scale: 1.1, x: -2 }} className="w-9 h-9 rounded-xl bg-white/4 border border-white/8 flex items-center justify-center text-gray-500 hover:text-white transition-colors cursor-pointer">
+                <ArrowLeft size={16} />
+              </motion.div>
+            </Link>
+            <div className="flex items-center gap-2">
+              <Sparkles size={12} className="text-red-500" />
+              <span className="text-[10px] font-black text-red-400 uppercase tracking-widest">New Event</span>
+            </div>
           </div>
-        </div>
+          <h1 className="text-4xl font-black text-white tracking-tight" style={{ fontFamily: "'Georgia', serif" }}>Create Event</h1>
+          <p className="text-gray-600 text-sm mt-1">Fill in the details for your new event</p>
+        </motion.div>
 
-        {/* Error */}
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="mb-6 p-4 bg-red-600/10 border border-red-600/50 rounded-lg"
-          >
-            <p className="text-red-500 text-sm">{error}</p>
-          </motion.div>
-        )}
+        <AnimatePresence>
+          {error && (
+            <motion.div initial={{ opacity: 0, y: -10, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+              className="mb-6 p-4 bg-red-500/8 border border-red-500/20 rounded-2xl flex items-start gap-3">
+              <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 shrink-0" />
+              <p className="text-red-300 text-sm">{error}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <form onSubmit={handleSubmit} className="space-y-6">
 
           {/* Image Upload */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Event Image
-            </label>
-            <div
-              className="relative border-2 border-dashed border-gray-700 rounded-xl overflow-hidden cursor-pointer hover:border-red-600/50 transition"
-              onClick={() => document.getElementById('image-upload')?.click()}
-            >
-              {imagePreview ? (
-                <img
-                  src={imagePreview}
-                  alt="Preview"
-                  className="w-full h-48 object-cover"
-                />
-              ) : (
-                <div className="h-48 flex flex-col items-center justify-center gap-2 text-gray-500">
-                  <Upload size={32} />
-                  <p className="text-sm">Click to upload image</p>
-                  <p className="text-xs">JPG, PNG, WEBP supported</p>
-                </div>
-              )}
-              <input
-                id="image-upload"
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                className="hidden"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              YouTube Trailer (optional)
-            </label>
-            <input
-              name="trailer_url"
-              type="url"
-              value={form.trailer_url}
-              onChange={handleChange}
-              placeholder="https://www.youtube.com/watch?v=..."
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
-            />
-          </div>
-
-          {/* Title */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Title <span className="text-red-500">*</span>
-            </label>
-            <input
-              name="title"
-              type="text"
-              required
-              value={form.title}
-              onChange={handleChange}
-              placeholder="Enter event title"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Description <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              name="description"
-              required
-              value={form.description}
-              onChange={handleChange}
-              placeholder="Describe your event..."
-              rows={4}
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600 resize-none"
-            />
-          </div>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+            <FormField label="Event Poster">
+              <div
+                onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
+                onClick={() => document.getElementById('img-upload')?.click()}
+                className={`relative rounded-2xl border-2 border-dashed overflow-hidden cursor-pointer transition-all duration-300 ${dragOver ? 'border-red-500/60 bg-red-500/5' : imagePreview ? 'border-white/10' : 'border-white/10 hover:border-white/20'}`}
+              >
+                <AnimatePresence mode="wait">
+                  {imagePreview ? (
+                    <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative">
+                      <img src={imagePreview} alt="Preview" className="w-full h-56 object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                      <div className="absolute bottom-4 left-4 flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center"><Check size={12} className="text-white" /></div>
+                        <span className="text-white text-xs font-semibold">Poster uploaded</span>
+                      </div>
+                      <button type="button" onClick={e => { e.stopPropagation(); setImagePreview(null); setImageFile(null) }}
+                        className="absolute top-3 right-3 w-7 h-7 rounded-full bg-black/60 backdrop-blur flex items-center justify-center text-white hover:bg-red-600/80 transition-colors">
+                        <X size={12} />
+                      </button>
+                    </motion.div>
+                  ) : (
+                    <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-48 flex flex-col items-center justify-center gap-3">
+                      <motion.div animate={{ y: dragOver ? -4 : [0, -4, 0] }} transition={{ duration: dragOver ? 0.1 : 2, repeat: dragOver ? 0 : Infinity }}>
+                        <Upload size={28} className="text-gray-600" />
+                      </motion.div>
+                      <div className="text-center">
+                        <p className="text-gray-500 text-sm font-medium">Drop image here or click to browse</p>
+                        <p className="text-gray-700 text-xs mt-1">JPG, PNG, WEBP · Recommended 2:3 ratio</p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                <input id="img-upload" type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+              </div>
+            </FormField>
+          </motion.div>
 
           {/* Event Type */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Event Type <span className="text-red-500">*</span>
-            </label>
-            <div className="grid grid-cols-4 gap-3">
-              {EVENT_TYPES.map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setForm({ ...form, event_type: type })}
-                  className={`py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all ${form.event_type === type
-                      ? 'border-red-600 bg-red-600/10 text-white'
-                      : 'border-gray-700 bg-gray-900 text-gray-400 hover:border-gray-600'
-                    }`}
-                >
-                  {type === 'MOVIE' ? '🎬' : type === 'CONCERT' ? '🎵' : type === 'SPORTS' ? '⚽' : '🎪'}
-                  <span className="ml-1">{type}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+            <FormField label="Event Type" required>
+              <div className="grid grid-cols-4 gap-3">
+                {EVENT_TYPES.map(type => {
+                  const isSelected = form.event_type === type.value
+                  return (
+                    <motion.button key={type.value} type="button" whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                      onClick={() => setForm({ ...form, event_type: type.value })}
+                      className={`relative flex flex-col items-center gap-2 p-3.5 rounded-2xl border-2 transition-all duration-200 overflow-hidden ${isSelected ? `border-transparent shadow-lg ${type.glow}` : 'border-white/6 bg-white/2 hover:border-white/12'}`}
+                    >
+                      {isSelected && <div className={`absolute inset-0 bg-gradient-to-br ${type.grad} opacity-15`} />}
+                      <div className={`relative w-8 h-8 rounded-xl flex items-center justify-center ${isSelected ? `bg-gradient-to-br ${type.grad}` : 'bg-white/6'}`}>
+                        <type.icon size={15} className={isSelected ? 'text-white' : 'text-gray-600'} />
+                      </div>
+                      <span className={`relative text-[11px] font-bold ${isSelected ? 'text-white' : 'text-gray-600'}`}>{type.label}</span>
+                    </motion.button>
+                  )
+                })}
+              </div>
+            </FormField>
+          </motion.div>
 
-          {/* Row: Duration + Language */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Duration (minutes)
-              </label>
-              <input
-                name="duration"
-                type="number"
-                value={form.duration}
-                onChange={handleChange}
-                placeholder="e.g. 120"
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Language
-              </label>
-              <input
-                name="language"
-                type="text"
-                value={form.language}
-                onChange={handleChange}
-                placeholder="e.g. Hindi, English"
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
-              />
-            </div>
-          </div>
+          {/* Title */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+            <FormField label="Title" required>
+              <input name="title" type="text" required value={form.title} onChange={handleChange} placeholder="Enter event title" className={inputCls} />
+            </FormField>
+          </motion.div>
 
-          {/* Row: Genre + Release Date */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Genre
-              </label>
-              <input
-                name="genre"
-                type="text"
-                value={form.genre}
-                onChange={handleChange}
-                placeholder="e.g. Action, Drama"
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Release Date
-              </label>
-              <input
-                name="release_date"
-                type="date"
-                value={form.release_date}
-                onChange={handleChange}
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
-              />
-            </div>
-          </div>
+          {/* Description */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+            <FormField label="Description" required>
+              <textarea name="description" required value={form.description} onChange={handleChange} placeholder="Describe your event..." rows={4}
+                className={inputCls + ' resize-none'} />
+            </FormField>
+          </motion.div>
 
-          {/* Submit */}
-          <div className="flex gap-4 pt-4">
-            <Link
-              href="/venue-dashboard"
-              className="flex-1 py-3 border border-gray-700 text-gray-300 rounded-lg hover:border-gray-500 transition text-center"
-            >
+          {/* Trailer */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }}>
+            <FormField label="YouTube Trailer" hint="Paste a YouTube URL to show a trailer background on the event page">
+              <div className="relative">
+                <Youtube size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600" />
+                <input name="trailer_url" type="url" value={form.trailer_url} onChange={handleChange}
+                  placeholder="https://www.youtube.com/watch?v=..." className={inputCls + ' pl-10'} />
+              </div>
+            </FormField>
+          </motion.div>
+
+          {/* Duration + Language */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="grid grid-cols-2 gap-4">
+            <FormField label="Duration (min)">
+              <input name="duration" type="number" value={form.duration} onChange={handleChange} placeholder="e.g. 120" className={inputCls} />
+            </FormField>
+            <FormField label="Language">
+              <input name="language" type="text" value={form.language} onChange={handleChange} placeholder="Hindi, English..." className={inputCls} />
+            </FormField>
+          </motion.div>
+
+          {/* Genre + Release Date */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="grid grid-cols-2 gap-4">
+            <FormField label="Genre">
+              <input name="genre" type="text" value={form.genre} onChange={handleChange} placeholder="Action, Drama..." className={inputCls} />
+            </FormField>
+            <FormField label="Release Date">
+              <input name="release_date" type="date" value={form.release_date} onChange={handleChange} className={inputCls} />
+            </FormField>
+          </motion.div>
+
+          {/* Actions */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="flex gap-4 pt-2">
+            <Link href="/venue-dashboard" className="flex-1 py-4 border border-white/8 text-gray-500 rounded-2xl hover:border-white/15 hover:text-gray-300 transition-all text-center text-sm font-semibold">
               Cancel
             </Link>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              type="submit"
-              disabled={loading}
-              className="flex-1 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 disabled:opacity-50 transition"
+            <motion.button whileHover={{ scale: 1.02, boxShadow: '0 10px 30px rgba(220,38,38,0.25)' }} whileTap={{ scale: 0.98 }}
+              type="submit" disabled={loading}
+              className={`flex-1 py-4 font-bold rounded-2xl text-white text-sm transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 bg-gradient-to-r ${selectedType.grad}`}
             >
-              {loading ? 'Creating...' : 'Create Event'}
+              {loading ? (
+                <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.7, repeat: Infinity }} className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
+              ) : (
+                <><selectedType.icon size={15} /><span>Create Event</span></>
+              )}
             </motion.button>
-          </div>
-
+          </motion.div>
         </form>
       </div>
     </div>

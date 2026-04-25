@@ -5,17 +5,29 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { authAPI, profileAPI } from '@/lib/api'
 import { motion, AnimatePresence } from 'framer-motion'
-import { UserPlus, Mail, Lock, Phone, User, Building2, Eye, EyeOff } from 'lucide-react'
+import { Mail, Lock, Phone, User, Building2, Eye, EyeOff, Film, ArrowRight, CheckCircle2, Sparkles } from 'lucide-react'
 
 type Role = 'Customer' | 'VENUE_OWNER'
 
-function getPasswordStrength(password: string): { label: string; color: string; width: string } {
-  if (password.length === 0) return { label: '', color: '', width: '0%' }
-  if (password.length < 6) return { label: 'Too short', color: 'bg-red-500', width: '25%' }
-  if (password.length < 8) return { label: 'Weak', color: 'bg-orange-500', width: '50%' }
-  if (!/[A-Z]/.test(password) || !/[0-9]/.test(password))
-    return { label: 'Fair', color: 'bg-yellow-500', width: '75%' }
-  return { label: 'Strong', color: 'bg-green-500', width: '100%' }
+function getPasswordStrength(p: string) {
+  if (!p) return { score: 0, label: '', color: '' }
+  if (p.length < 6) return { score: 1, label: 'Too short', color: 'bg-red-500' }
+  if (p.length < 8) return { score: 2, label: 'Weak', color: 'bg-orange-500' }
+  if (!/[A-Z]/.test(p) || !/[0-9]/.test(p)) return { score: 3, label: 'Fair', color: 'bg-yellow-400' }
+  return { score: 4, label: 'Strong', color: 'bg-emerald-500' }
+}
+
+function Field({ label, icon: Icon, error, children, focusedField, name }: any) {
+  const isFocused = focusedField === name
+  return (
+    <div>
+      <label className="block text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2">{label}</label>
+      <div className={`relative rounded-2xl border transition-all duration-200 ${isFocused ? 'border-red-500/50 bg-white/4 shadow-lg shadow-red-500/8' : error ? 'border-red-500/40 bg-white/3' : 'border-white/6 bg-white/3'}`}>
+        {Icon && <Icon size={14} className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${isFocused ? 'text-red-400' : 'text-gray-600'}`} />}
+        {children}
+      </div>
+    </div>
+  )
 }
 
 export default function RegisterPage() {
@@ -29,28 +41,19 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [agreedToTerms, setAgreedToTerms] = useState(false)
-  const [form, setForm] = useState({
-    name: '',
-    email: '',
-    phone_number: '',
-    password: '',
-    confirmPassword: '',
-    role: 'Customer' as Role,
-  })
+  const [focusedField, setFocusedField] = useState<string | null>(null)
+  const [form, setForm] = useState({ name: '', email: '', phone_number: '', password: '', confirmPassword: '', role: 'Customer' as Role })
   const [otp, setOtp] = useState('')
+  const strength = getPasswordStrength(form.password)
 
-  const passwordStrength = getPasswordStrength(form.password)
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => { setForm({ ...form, [e.target.name]: e.target.value }); setError('') }
+  const focus = (name: string) => setFocusedField(name)
+  const blur = () => setFocusedField(null)
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
-    setError('')
-  }
-
-  const getValidationError = (): string => {
+  const getValidationError = () => {
     if (!form.name.trim()) return 'Full name is required.'
     if (!form.email.includes('@')) return 'Enter a valid email address.'
-    if (form.phone_number.length !== 10 || !/^\d+$/.test(form.phone_number))
-      return 'Enter a valid 10-digit phone number.'
+    if (form.phone_number.length !== 10 || !/^\d+$/.test(form.phone_number)) return 'Enter a valid 10-digit phone number.'
     if (form.password.length < 6) return 'Password must be at least 6 characters.'
     if (form.password !== form.confirmPassword) return 'Passwords do not match.'
     if (!agreedToTerms) return 'Please agree to the Terms & Conditions.'
@@ -59,356 +62,246 @@ export default function RegisterPage() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
-    const validationError = getValidationError()
-    if (validationError) { setError(validationError); return }
-    setLoading(true)
-    setError('')
+    const ve = getValidationError(); if (ve) { setError(ve); return }
+    setLoading(true); setError('')
     try {
-      await authAPI.register({
-        name: form.name,
-        email: form.email,
-        phone_number: form.phone_number,
-        password: form.password,
-        role: form.role,
-      })
-      setStep('otp')
-      startResendCooldown()
-    } catch (err: unknown) {
-      const data = (err as { response?: { data?: Record<string, string[]> } })?.response?.data
-      if (data) {
-        const messages = Object.values(data).flat()
-        setError(messages.join(' '))
-      } else {
-        setError('Something went wrong. Please try again.')
-      }
-    } finally {
-      setLoading(false)
-    }
+      await authAPI.register({ name: form.name, email: form.email, phone_number: form.phone_number, password: form.password, role: form.role })
+      setStep('otp'); startResendCooldown()
+    } catch (err: any) {
+      const data = err?.response?.data
+      setError(data ? Object.values(data).flat().join(' ') : 'Something went wrong.')
+    } finally { setLoading(false) }
   }
 
   const startResendCooldown = () => {
     setResendCooldown(30)
-    const interval = setInterval(() => {
-      setResendCooldown(prev => {
-        if (prev <= 1) { clearInterval(interval); return 0 }
-        return prev - 1
-      })
-    }, 1000)
+    const iv = setInterval(() => setResendCooldown(p => { if (p <= 1) { clearInterval(iv); return 0 } return p - 1 }), 1000)
   }
 
   const handleResendOTP = async () => {
-    setResending(true)
-    setError('')
-    setSuccess('')
-    try {
-      await profileAPI.resendOTP(form.email)
-      setSuccess('OTP resent successfully! Check your email.')
-      startResendCooldown()
-    } catch (err: unknown) {
-      setError((err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to resend OTP.')
-    } finally {
-      setResending(false)
-    }
+    setResending(true); setError(''); setSuccess('')
+    try { await profileAPI.resendOTP(form.email); setSuccess('OTP resent! Check your email.'); startResendCooldown() }
+    catch (err: any) { setError(err?.response?.data?.error || 'Failed to resend OTP.') }
+    finally { setResending(false) }
   }
 
   const handleVerifyOTP = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-    setSuccess('')
+    e.preventDefault(); setLoading(true); setError(''); setSuccess('')
     try {
       await authAPI.verifyOTP({ email: form.email, otp })
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: form.email, password: form.password }),
-      })
+      const res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: form.email, password: form.password }) })
       const data = await res.json()
-      if (!res.ok) { setError(data.error || 'Login failed after registration'); return }
+      if (!res.ok) { setError(data.error || 'Login failed'); return }
       window.dispatchEvent(new Event('authChange'))
       router.push(form.role === 'VENUE_OWNER' ? '/venue-dashboard' : '/')
-    } catch (err: unknown) {
-      const data = (err as { response?: { data?: { non_field_errors?: string[]; otp?: string[] } } })?.response?.data
-      setError(data?.non_field_errors?.[0] || data?.otp?.[0] || 'Invalid OTP. Please try again.')
-    } finally {
-      setLoading(false)
-    }
+    } catch (err: any) {
+      const data = err?.response?.data
+      setError(data?.non_field_errors?.[0] || data?.otp?.[0] || 'Invalid OTP.')
+    } finally { setLoading(false) }
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center px-4 py-12">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="w-full max-w-md"
-      >
-        <div className="bg-gray-900 border border-gray-800 rounded-lg p-8">
+    <div className="min-h-screen bg-[#070707] flex items-center justify-center px-4 py-12 relative overflow-hidden">
+      {/* Background */}
+      <div className="fixed inset-0 pointer-events-none">
+        <motion.div animate={{ x: [0, 25, 0], y: [0, -15, 0] }} transition={{ duration: 18, repeat: Infinity }} className="absolute top-0 right-1/4 w-[500px] h-[500px] rounded-full bg-red-900/12 blur-[100px]" />
+        <motion.div animate={{ x: [0, -20, 0], y: [0, 25, 0] }} transition={{ duration: 22, repeat: Infinity, delay: 4 }} className="absolute bottom-0 left-1/4 w-[400px] h-[400px] rounded-full bg-violet-900/8 blur-[100px]" />
+        <div className="absolute inset-0 opacity-[0.018]" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px)', backgroundSize: '44px 44px' }} />
+      </div>
 
-          {/* Header */}
-          <div className="text-center mb-8">
-            <motion.div whileHover={{ scale: 1.1, rotate: 5 }} className="inline-block mb-4">
-              <UserPlus className="text-red-600" size={40} />
+      <div className="w-full max-w-md relative z-10">
+        {/* Logo */}
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="text-center mb-8">
+          <Link href="/" className="inline-flex items-center gap-3 group">
+            <motion.div whileHover={{ rotate: [0, -10, 10, 0] }} className="relative w-9 h-9 flex items-center justify-center">
+              <div className="absolute inset-0 bg-red-600 rounded-xl rotate-6 group-hover:rotate-12 transition-transform duration-300" />
+              <Film size={18} className="relative text-white" />
             </motion.div>
-            <h1 className="text-3xl font-bold text-white mb-2">
-              {step === 'details' ? 'Create Account' : 'Verify Email'}
-            </h1>
-            <p className="text-gray-400 text-sm">
-              {step === 'details' ? 'Join TicketFlix today' : `OTP sent to ${form.email}`}
-            </p>
-          </div>
+            <span className="text-xl font-black text-white">Ticket<span className="text-red-500">Flix</span></span>
+          </Link>
+        </motion.div>
 
-          {/* Step indicator */}
-          <div className="flex items-center justify-center gap-2 mb-8">
-            <div className="h-1.5 w-20 rounded-full bg-red-600" />
-            <div className={`h-1.5 w-20 rounded-full transition-all duration-500 ${step === 'otp' ? 'bg-red-600' : 'bg-gray-700'}`} />
-          </div>
+        <motion.div initial={{ opacity: 0, y: 20, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.5, delay: 0.1, ease: [0.23, 1, 0.32, 1] }} className="relative">
+          {/* Card glow */}
+          <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-red-600/8 to-transparent blur-xl" />
 
-          {/* Error / Success */}
-          <AnimatePresence>
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0 }}
-                className="mb-4 p-4 bg-red-600/10 border border-red-600/50 rounded-lg"
-              >
-                <p className="text-red-400 text-sm">{error}</p>
-              </motion.div>
-            )}
-            {success && (
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0 }}
-                className="mb-4 p-4 bg-green-600/10 border border-green-600/50 rounded-lg"
-              >
-                <p className="text-green-400 text-sm">{success}</p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <div className="relative bg-[#0f0f0f]/90 backdrop-blur-xl border border-white/8 rounded-3xl overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-red-500/50 to-transparent" />
 
-          <AnimatePresence mode="wait">
-
-            {/* Step 1 — Details */}
-            {step === 'details' && (
-              <motion.form
-                key="details"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                onSubmit={handleRegister}
-                className="space-y-4"
-              >
-                {/* Role Toggle */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-3">I am a...</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {(['Customer', 'VENUE_OWNER'] as Role[]).map((role) => (
-                      <button
-                        key={role}
-                        type="button"
-                        onClick={() => setForm({ ...form, role })}
-                        className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all duration-200 ${form.role === role
-                            ? 'border-red-600 bg-red-600/10 text-white'
-                            : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
-                          }`}
-                      >
-                        {role === 'Customer' ? <User size={24} /> : <Building2 size={24} />}
-                        <span className="text-sm font-medium">
-                          {role === 'Customer' ? 'Customer' : 'Venue Owner'}
-                        </span>
-                        <span className="text-xs text-center opacity-70">
-                          {role === 'Customer' ? 'Book tickets & events' : 'List & manage events'}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Full Name</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
-                    <input
-                      name="name" type="text" required value={form.name}
-                      onChange={handleChange} placeholder="John Doe" disabled={loading}
-                      className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
-                    />
-                  </div>
-                </div>
-
-                {/* Email */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Email Address</label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
-                    <input
-                      name="email" type="email" required value={form.email}
-                      onChange={handleChange} placeholder="john@example.com" disabled={loading}
-                      className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
-                    />
-                  </div>
-                </div>
-
-                {/* Phone */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Phone Number</label>
-                  <div className="flex">
-                    <span className="bg-gray-700 text-gray-300 px-3 py-2 rounded-l-lg border border-gray-700 border-r-0 text-sm flex items-center">+91</span>
-                    <div className="relative flex-1">
-                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                      <input
-                        name="phone_number" type="tel" required maxLength={10}
-                        value={form.phone_number} onChange={handleChange}
-                        placeholder="9876543210" disabled={loading}
-                        className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-r-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Password */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Password</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
-                    <input
-                      name="password" type={showPassword ? 'text' : 'password'} required
-                      value={form.password} onChange={handleChange}
-                      placeholder="Min. 6 characters" disabled={loading}
-                      className="w-full pl-10 pr-12 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
-                    />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                  {form.password.length > 0 && (
-                    <div className="mt-2">
-                      <div className="w-full bg-gray-700 rounded-full h-1.5">
-                        <div className={`h-1.5 rounded-full transition-all duration-300 ${passwordStrength.color}`}
-                          style={{ width: passwordStrength.width }} />
-                      </div>
-                      <p className="text-xs text-gray-400 mt-1">{passwordStrength.label}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Confirm Password */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Confirm Password</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
-                    <input
-                      name="confirmPassword" type={showConfirm ? 'text' : 'password'} required
-                      value={form.confirmPassword} onChange={handleChange}
-                      placeholder="Re-enter password" disabled={loading}
-                      className={`w-full pl-10 pr-12 py-2 bg-gray-800 border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600 ${form.confirmPassword && form.password !== form.confirmPassword
-                          ? 'border-red-500' : 'border-gray-700'
-                        }`}
-                    />
-                    <button type="button" onClick={() => setShowConfirm(!showConfirm)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
-                      {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                  {form.confirmPassword && form.password !== form.confirmPassword && (
-                    <p className="text-red-400 text-xs mt-1">Passwords don't match</p>
-                  )}
-                </div>
-
-                {/* Terms */}
-                <label className="flex items-start gap-2 cursor-pointer">
-                  <input
-                    type="checkbox" checked={agreedToTerms}
-                    onChange={(e) => setAgreedToTerms(e.target.checked)}
-                    className="w-4 h-4 mt-0.5 accent-red-600"
-                  />
-                  <span className="text-gray-400 text-sm">
-                    I agree to the{' '}
-                    <Link href="/terms" className="text-red-500 hover:text-red-400">Terms & Conditions</Link>
-                    {' '}and{' '}
-                    <Link href="/privacy" className="text-red-500 hover:text-red-400">Privacy Policy</Link>
+            <div className="p-8">
+              {/* Header */}
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-1">
+                  <Sparkles size={12} className="text-red-500" />
+                  <span className="text-[10px] font-black text-red-400 uppercase tracking-widest">
+                    {step === 'details' ? 'New account' : 'Verify email'}
                   </span>
-                </label>
-
-                <motion.button
-                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                  type="submit" disabled={loading}
-                  className="w-full py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 disabled:opacity-50 mt-2"
-                >
-                  {loading ? 'Sending OTP...' : 'Send OTP →'}
-                </motion.button>
-
-                <p className="text-center text-gray-400 text-sm">
-                  Already have an account?{' '}
-                  <Link href="/login" className="text-red-600 hover:text-red-500 font-semibold">Login</Link>
-                </p>
-              </motion.form>
-            )}
-
-            {/* Step 2 — OTP */}
-            {step === 'otp' && (
-              <motion.form
-                key="otp"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                onSubmit={handleVerifyOTP}
-                className="space-y-6"
-              >
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2 text-center">
-                    Enter the 6-digit OTP sent to your email
-                  </label>
-                  <input
-                    type="text" maxLength={6} value={otp}
-                    onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '')); setError('') }}
-                    placeholder="• • • • • •" disabled={loading}
-                    className="w-full bg-gray-800 text-white text-center text-2xl tracking-[0.5em] border border-gray-700 rounded-lg px-4 py-4 focus:outline-none focus:border-red-600 transition"
-                  />
-                  <p className="text-center text-gray-500 text-xs mt-2">
-                    OTP expires in 5 minutes. Check spam folder too.
-                  </p>
                 </div>
+                <h1 className="text-2xl font-black text-white tracking-tight" style={{ fontFamily: "'Georgia', serif" }}>
+                  {step === 'details' ? 'Join TicketFlix' : 'Check your inbox'}
+                </h1>
+                {step === 'otp' && <p className="text-gray-600 text-xs mt-1">OTP sent to <span className="text-gray-400">{form.email}</span></p>}
+              </div>
 
-                <motion.button
-                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                  type="submit" disabled={loading || otp.length !== 6}
-                  className="w-full py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 disabled:opacity-50"
-                >
-                  {loading ? 'Verifying...' : 'Verify & Create Account'}
-                </motion.button>
+              {/* Step indicator */}
+              <div className="flex items-center gap-2 mb-7">
+                <div className="h-1 flex-1 rounded-full bg-red-600" />
+                <div className={`h-1 flex-1 rounded-full transition-all duration-500 ${step === 'otp' ? 'bg-red-600' : 'bg-white/8'}`} />
+              </div>
 
-                {/* Resend OTP */}
-                <div className="text-center">
-                  <p className="text-gray-500 text-sm mb-2">Didn't receive the OTP?</p>
-                  <button
-                    type="button"
-                    onClick={handleResendOTP}
-                    disabled={resending || resendCooldown > 0}
-                    className="text-red-500 hover:text-red-400 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition"
-                  >
-                    {resending ? 'Resending...' :
-                      resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend OTP'}
-                  </button>
-                </div>
+              {/* Alerts */}
+              <AnimatePresence>
+                {error && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mb-4 p-3.5 bg-red-500/8 border border-red-500/20 rounded-2xl flex gap-2.5">
+                    <div className="w-1 h-1 rounded-full bg-red-500 mt-1.5 shrink-0" />
+                    <p className="text-red-300 text-xs leading-relaxed">{error}</p>
+                  </motion.div>
+                )}
+                {success && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mb-4 p-3.5 bg-emerald-500/8 border border-emerald-500/20 rounded-2xl flex items-center gap-2">
+                    <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                    <p className="text-emerald-300 text-xs">{success}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-                <button
-                  type="button"
-                  onClick={() => { setStep('details'); setOtp(''); setError(''); setSuccess('') }}
-                  className="w-full text-gray-500 hover:text-gray-300 text-sm transition"
-                >
-                  ← Go back and edit details
-                </button>
-              </motion.form>
-            )}
+              <AnimatePresence mode="wait">
+                {step === 'details' && (
+                  <motion.form key="details" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} onSubmit={handleRegister} className="space-y-4">
 
-          </AnimatePresence>
-        </div>
-      </motion.div>
+                    {/* Role Selector */}
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-600 uppercase tracking-widest mb-3">I am a...</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {(['Customer', 'VENUE_OWNER'] as Role[]).map((role) => (
+                          <motion.button key={role} type="button" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                            onClick={() => setForm({ ...form, role })}
+                            className={`relative flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-200 overflow-hidden ${form.role === role ? 'border-red-500/60 bg-red-500/8' : 'border-white/6 bg-white/2 hover:border-white/12'}`}
+                          >
+                            {form.role === role && <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-red-500" />}
+                            {role === 'Customer' ? <User size={22} className={form.role === role ? 'text-red-400' : 'text-gray-600'} /> : <Building2 size={22} className={form.role === role ? 'text-red-400' : 'text-gray-600'} />}
+                            <span className={`text-xs font-bold ${form.role === role ? 'text-white' : 'text-gray-500'}`}>{role === 'Customer' ? 'Customer' : 'Venue Owner'}</span>
+                          </motion.button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Name */}
+                    <Field label="Full Name" icon={User} name="name" focusedField={focusedField}>
+                      <input name="name" type="text" required value={form.name} onChange={handleChange}
+                        onFocus={() => focus('name')} onBlur={blur} placeholder="John Doe" disabled={loading}
+                        className="w-full pl-11 pr-4 py-3.5 bg-transparent text-white placeholder-gray-700 text-sm focus:outline-none" />
+                    </Field>
+
+                    {/* Email */}
+                    <Field label="Email" icon={Mail} name="email" focusedField={focusedField}>
+                      <input name="email" type="email" required value={form.email} onChange={handleChange}
+                        onFocus={() => focus('email')} onBlur={blur} placeholder="john@example.com" disabled={loading}
+                        className="w-full pl-11 pr-4 py-3.5 bg-transparent text-white placeholder-gray-700 text-sm focus:outline-none" />
+                    </Field>
+
+                    {/* Phone */}
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2">Phone</label>
+                      <div className={`flex rounded-2xl border overflow-hidden transition-all duration-200 ${focusedField === 'phone' ? 'border-red-500/50 shadow-lg shadow-red-500/8' : 'border-white/6'}`}>
+                        <span className="bg-white/3 text-gray-500 px-3 py-3.5 text-sm font-medium border-r border-white/6 flex items-center">+91</span>
+                        <div className="relative flex-1 bg-white/3">
+                          <Phone size={14} className={`absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${focusedField === 'phone' ? 'text-red-400' : 'text-gray-600'}`} />
+                          <input name="phone_number" type="tel" required maxLength={10} value={form.phone_number} onChange={handleChange}
+                            onFocus={() => focus('phone')} onBlur={blur} placeholder="9876543210" disabled={loading}
+                            className="w-full pl-10 pr-4 py-3.5 bg-transparent text-white placeholder-gray-700 text-sm focus:outline-none" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Password */}
+                    <Field label="Password" icon={Lock} name="password" focusedField={focusedField}>
+                      <input name="password" type={showPassword ? 'text' : 'password'} required value={form.password}
+                        onChange={handleChange} onFocus={() => focus('password')} onBlur={blur}
+                        placeholder="Min. 6 characters" disabled={loading}
+                        className="w-full pl-11 pr-12 py-3.5 bg-transparent text-white placeholder-gray-700 text-sm focus:outline-none" />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-300 transition-colors">
+                        {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </Field>
+
+                    {form.password && (
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="-mt-2 px-1">
+                        <div className="flex gap-1 mb-1">
+                          {[1, 2, 3, 4].map(i => (
+                            <div key={i} className={`flex-1 h-1 rounded-full transition-all duration-300 ${i <= strength.score ? strength.color : 'bg-white/8'}`} />
+                          ))}
+                        </div>
+                        <span className="text-[10px] text-gray-600">{strength.label}</span>
+                      </motion.div>
+                    )}
+
+                    {/* Confirm Password */}
+                    <Field label="Confirm Password" icon={Lock} name="confirm" focusedField={focusedField}>
+                      <input name="confirmPassword" type={showConfirm ? 'text' : 'password'} required value={form.confirmPassword}
+                        onChange={handleChange} onFocus={() => focus('confirm')} onBlur={blur}
+                        placeholder="Re-enter password" disabled={loading}
+                        className="w-full pl-11 pr-12 py-3.5 bg-transparent text-white placeholder-gray-700 text-sm focus:outline-none" />
+                      <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-300 transition-colors">
+                        {showConfirm ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </Field>
+
+                    {form.confirmPassword && form.password !== form.confirmPassword && (
+                      <p className="text-red-400 text-xs -mt-2 px-1">Passwords don't match</p>
+                    )}
+
+                    {/* Terms */}
+                    <label className="flex items-start gap-3 cursor-pointer group">
+                      <div className={`w-4 h-4 rounded-md border-2 flex items-center justify-center mt-0.5 shrink-0 transition-all ${agreedToTerms ? 'bg-red-600 border-red-600' : 'border-white/20 group-hover:border-white/40'}`} onClick={() => setAgreedToTerms(!agreedToTerms)}>
+                        {agreedToTerms && <motion.svg initial={{ scale: 0 }} animate={{ scale: 1 }} width="10" height="10" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" /></motion.svg>}
+                      </div>
+                      <span className="text-gray-600 text-xs leading-relaxed">I agree to the <Link href="/terms" className="text-red-500 hover:text-red-400">Terms</Link> & <Link href="/privacy" className="text-red-500 hover:text-red-400">Privacy Policy</Link></span>
+                    </label>
+
+                    <motion.button whileHover={{ scale: 1.02, boxShadow: '0 10px 30px rgba(220,38,38,0.25)' }} whileTap={{ scale: 0.98 }} type="submit" disabled={loading}
+                      className="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50">
+                      {loading ? <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.7, repeat: Infinity }} className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full" /> : <><span>Send OTP</span><ArrowRight size={14} /></>}
+                    </motion.button>
+
+                    <p className="text-center text-gray-600 text-xs">Already have an account? <Link href="/login" className="text-red-500 hover:text-red-400 font-bold">Sign in</Link></p>
+                  </motion.form>
+                )}
+
+                {step === 'otp' && (
+                  <motion.form key="otp" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} onSubmit={handleVerifyOTP} className="space-y-5">
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-600 uppercase tracking-widest mb-3 text-center">6-digit OTP</label>
+                      <div className={`relative rounded-2xl border transition-all ${focusedField === 'otp' ? 'border-red-500/50 bg-white/4 shadow-lg shadow-red-500/8' : 'border-white/6 bg-white/3'}`}>
+                        <input type="text" maxLength={6} value={otp} onChange={e => { setOtp(e.target.value.replace(/\D/g, '')); setError('') }}
+                          onFocus={() => focus('otp')} onBlur={blur} placeholder="• • • • • •" disabled={loading}
+                          className="w-full bg-transparent text-white text-center text-3xl tracking-[0.6em] py-5 focus:outline-none font-mono placeholder-gray-800" />
+                      </div>
+                      <p className="text-center text-gray-700 text-[10px] mt-2">OTP expires in 5 minutes · Check spam folder</p>
+                    </div>
+
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} type="submit" disabled={loading || otp.length !== 6}
+                      className="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-40">
+                      {loading ? <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.7, repeat: Infinity }} className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full" /> : <><CheckCircle2 size={15} /><span>Verify & Create Account</span></>}
+                    </motion.button>
+
+                    <div className="text-center">
+                      <p className="text-gray-700 text-xs mb-2">Didn't receive it?</p>
+                      <button type="button" onClick={handleResendOTP} disabled={resending || resendCooldown > 0}
+                        className="text-red-500 hover:text-red-400 text-sm font-bold disabled:opacity-40 transition-colors">
+                        {resending ? 'Resending...' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend OTP'}
+                      </button>
+                    </div>
+
+                    <button type="button" onClick={() => { setStep('details'); setOtp(''); setError(''); setSuccess('') }}
+                      className="w-full text-gray-700 hover:text-gray-400 text-xs transition-colors">← Back to details</button>
+                  </motion.form>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </motion.div>
+      </div>
     </div>
   )
 }
