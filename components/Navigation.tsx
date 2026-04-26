@@ -122,7 +122,15 @@ export default function Navigation() {
   const checkAuth = useCallback(async () => {
     try {
       const res = await fetch('/api/auth/me')
-      if (!res.ok) { setAuthState(null); return }
+      if (!res.ok) {
+        // 🔥 CLEAR INVALID STATE
+        document.cookie = "authToken=; Max-Age=0; path=/"
+        document.cookie = "refreshToken=; Max-Age=0; path=/"
+        document.cookie = "user=; Max-Age=0; path=/"
+            
+        setAuthState(null)
+        return
+      }
       const parsed = await res.json()
       if (parsed?.role) {
         setAuthState(parsed)

@@ -29,7 +29,17 @@ apiClient.interceptors.response.use(
       try {
         const res = await fetch('/api/auth/refresh', { method: 'POST' })
         if (!res.ok) {
-          if (typeof window !== 'undefined') window.location.href = '/login'
+          // 🔥 CLEAR ALL COOKIES (CRITICAL FIX)
+          document.cookie = "authToken=; Max-Age=0; path=/"
+          document.cookie = "refreshToken=; Max-Age=0; path=/"
+          document.cookie = "user=; Max-Age=0; path=/"
+                
+          window.dispatchEvent(new Event('authChange'))
+                
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login'
+          }
+        
           return Promise.reject(error)
         }
         return apiClient(originalRequest)
