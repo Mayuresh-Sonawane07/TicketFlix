@@ -47,6 +47,38 @@ export default function Login() {
     if (saved) { setEmail(saved); setRememberMe(true) }
   }, [])
 
+  const initializeGoogle = () => {
+    const el = document.getElementById('google-btn')
+    if (!window.google || !el) return false
+
+    window.google.accounts.id.initialize({
+      client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
+      callback: handleGoogleResponse,
+   })
+
+    el.innerHTML = '' // prevent duplicate render
+
+    window.google.accounts.id.renderButton(el, {
+      theme: 'filled_black',   // 🔥 better for your dark UI
+      size: 'large',
+      shape: 'pill',
+      width: 350,
+      text: 'continue_with',
+    })
+
+    return true
+  }
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (initializeGoogle()) {
+        clearInterval(interval)
+      }
+    }, 300)
+  
+    return () => clearInterval(interval)
+  }, [])
+
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = cardRef.current?.getBoundingClientRect()
     if (!rect) return
@@ -108,13 +140,6 @@ export default function Login() {
     finally { setIsGoogleLoading(false) }
   }
 
-  const initializeGoogle = () => {
-    if (window.google) {
-      window.google.accounts.id.initialize({ client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!, callback: handleGoogleResponse })
-      window.google.accounts.id.renderButton(document.getElementById('google-btn')!, { theme: 'outline', size: 'large', width: 400, text: 'continue_with' })
-    }
-  }
-
   const floatingData = FLOATING_ITEMS.map((e, i) => ({
     emoji: e, x: 5 + (i * 13) % 90, y: 10 + (i * 17) % 80,
     delay: i * 0.8, duration: 5 + (i % 3) * 2
@@ -122,7 +147,7 @@ export default function Login() {
 
   return (
     <>
-      <Script src="https://accounts.google.com/gsi/client" onLoad={initializeGoogle} strategy="afterInteractive" />
+      <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
 
       <div className="min-h-screen bg-[#070707] flex items-center justify-center px-4 relative overflow-hidden">
 
@@ -255,14 +280,23 @@ export default function Login() {
                 </div>
 
                 {/* Google */}
-                {isGoogleLoading ? (
-                  <div className="w-full py-3 border border-white/8 rounded-2xl flex items-center justify-center gap-2">
-                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.7, repeat: Infinity }} className="w-4 h-4 border-2 border-white/20 border-t-white/60 rounded-full" />
-                    <span className="text-gray-500 text-sm">Signing in with Google...</span>
-                  </div>
-                ) : (
-                  <div id="google-btn" className="w-full flex justify-center" />
-                )}
+                <div className="w-full flex justify-center bg-white/5 border border-white/10 rounded-2xl p-2 min-h-[50px] items-center relative">
+
+                  {/* ✅ ALWAYS present */}
+                  <div id="google-btn" />
+
+                  {/* ✅ overlay loader */}
+                  {isGoogleLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-2xl">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 0.7, repeat: Infinity }}
+                        className="w-4 h-4 border-2 border-white/20 border-t-white/60 rounded-full mr-2"
+                      />
+                      <span className="text-gray-400 text-sm">Signing in with Google...</span>
+                    </div>
+                  )}
+                </div>
 
                 {/* Register */}
                 <p className="text-center text-gray-600 text-sm mt-6">
