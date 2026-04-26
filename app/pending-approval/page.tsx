@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { Film, Clock, Mail, CheckCircle2, ArrowRight, Sparkles, Shield, Bell, MessageCircle } from 'lucide-react'
+import SupportWidget from '@/components/SupportWidget'
 
 const steps = [
   {
@@ -139,7 +140,7 @@ export default function PendingApprovalPage() {
               </div>
             </motion.div>
 
-            {/* Support CTA */}
+            {/* Support CTA — points to the widget */}
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }}
               className="p-4 bg-red-500/5 border border-red-500/15 rounded-2xl mb-6 flex gap-3 items-center">
               <MessageCircle size={16} className="text-red-400 shrink-0" />
@@ -171,6 +172,9 @@ export default function PendingApprovalPage() {
           </a>
         </motion.p>
       </div>
+
+      {/* Support widget — venue owners on this page are logged in and can open tickets */}
+      <SupportWidget />
     </div>
   )
 }

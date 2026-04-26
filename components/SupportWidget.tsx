@@ -36,36 +36,33 @@ export default function SupportWidget() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  // isLoggedIn now covers any authenticated user including unapproved venue owners
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // Check auth status
-  useEffect(() => {
+  // Check auth status — treat any user with an id/email as logged-in,
+  // even if their role isn't fully approved yet (e.g. pending venue owners).
+  const checkAuth = () => {
     fetch('/api/auth/me')
       .then(r => r.ok ? r.json() : null)
       .then(data => {
-        if (data?.role) {
-          setIsLoggedIn(true)
-          setUserRole(data.role)
-        }
+        // Consider logged in if we get back any user object (has email or id)
+        const loggedIn = !!(data?.email || data?.id || data?.role)
+        setIsLoggedIn(loggedIn)
+        setUserRole(data?.role || null)
       })
       .catch(() => {})
+  }
 
-    const handler = () => {
-      fetch('/api/auth/me')
-        .then(r => r.ok ? r.json() : null)
-        .then(data => {
-          setIsLoggedIn(!!data?.role)
-          setUserRole(data?.role || null)
-        })
-        .catch(() => {})
-    }
+  useEffect(() => {
+    checkAuth()
+    const handler = () => checkAuth()
     window.addEventListener('authChange', handler)
     return () => window.removeEventListener('authChange', handler)
   }, [])
 
-  // Load tickets when opened
+  // Load tickets when opened (for any logged-in non-admin user)
   useEffect(() => {
     if (open && isLoggedIn && userRole !== 'Admin') {
       loadTickets()
@@ -83,7 +80,7 @@ export default function SupportWidget() {
       const res = await apiClient.get<Ticket[]>('/users/support/tickets/')
       setTickets(res.data)
     } catch {
-      // silently fail — user might not be logged in
+      // silently fail
     } finally {
       setLoading(false)
     }
