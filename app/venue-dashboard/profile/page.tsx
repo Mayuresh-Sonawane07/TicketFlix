@@ -58,7 +58,7 @@ export default function ProfilePage() {
     try {
       await profileAPI.deleteAccount({ password: deletePassword })
       await fetch('/api/auth/logout', { method: 'POST' })
-      window.dispatchEvent(new Event('authChange')); router.push('/')
+      window.dispatchEvent(new Event('authChange')); router.push('/login')
     } catch (err: any) { setError(err.response?.data?.error || 'Failed to delete account.') } finally { setSaving(false) }
   }
 
