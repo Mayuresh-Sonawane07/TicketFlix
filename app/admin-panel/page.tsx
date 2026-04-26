@@ -9,7 +9,8 @@ import {
   ShieldAlert, Bell, Play, CheckCircle2, XCircle, Flag,
   Trash2, Ban, UserCheck, Send,
   TrendingUp, AlertTriangle, DollarSign, Activity, Clock,
-  X, Check, LogOut, Sparkles, Film,
+  X, Check, LogOut, Sparkles, Film, MessageCircle, ChevronDown,
+  ChevronRight, Loader2, RefreshCw,
 } from 'lucide-react'
 
 interface DashStats {
@@ -20,13 +21,14 @@ interface DashStats {
   fraud: { suspicious_users: number }
 }
 
-type Tab = 'dashboard' | 'venue-owners' | 'users' | 'events' | 'shows' | 'bookings' | 'revenue' | 'fraud' | 'notifications'
+type Tab = 'dashboard' | 'venue-owners' | 'users' | 'events' | 'shows' | 'bookings' | 'revenue' | 'fraud' | 'notifications' | 'support'
 
 const api = (path: string) => `/admin-panel${path}`
 
 function fmt(n: number) { return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n) }
 function fmtCurrency(n: number) { return `₹${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n)}` }
 function fmtDate(d: string) { if (!d) return '—'; return new Date(d).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) }
+function fmtTime(d: string) { if (!d) return ''; return new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) }
 
 function StatCard({ label, value, icon, accent = 'red', sub, onClick }: {
   label: string; value: string | number; icon: React.ReactNode; accent?: string; sub?: string; onClick?: () => void
@@ -100,6 +102,286 @@ function Empty({ text }: { text: string }) {
     </div>
   )
 }
+
+// ── SUPPORT TAB ─────────────────────────────────────────────────────────────
+
+interface SupportMessage {
+  id: number
+  message: string
+  is_from_user: boolean
+  created_at: string
+  admin_name?: string
+}
+
+interface SupportTicket {
+  id: number
+  subject: string
+  status: 'open' | 'in_progress' | 'resolved' | 'closed'
+  created_at: string
+  updated_at: string
+  user_email: string
+  user_name: string
+  messages: SupportMessage[]
+}
+
+const ticketStatusColor: Record<string, string> = {
+  open: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+  in_progress: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+  resolved: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+  closed: 'text-gray-500 bg-white/5 border-white/10',
+}
+const ticketStatusBadgeColor: Record<string, string> = {
+  open: 'yellow', in_progress: 'blue', resolved: 'green', closed: 'gray',
+}
+
+function SupportTab() {
+  const [tickets, setTickets] = useState<SupportTicket[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState<'all' | 'open' | 'in_progress' | 'resolved' | 'closed'>('open')
+  const [activeTicket, setActiveTicket] = useState<SupportTicket | null>(null)
+  const [replyText, setReplyText] = useState('')
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState('')
+
+  const loadTickets = useCallback(() => {
+    setLoading(true)
+    const q = filter !== 'all' ? `?status=${filter}` : ''
+    apiClient.get(api(`/support/tickets/${q}`))
+      .then(r => setTickets(r.data))
+      .catch(() => setTickets([]))
+      .finally(() => setLoading(false))
+  }, [filter])
+
+  useEffect(() => { loadTickets() }, [loadTickets])
+
+  const openTicket = async (ticket: SupportTicket) => {
+    try {
+      const res = await apiClient.get<SupportTicket>(api(`/support/tickets/${ticket.id}/`))
+      setActiveTicket(res.data)
+    } catch {
+      setActiveTicket(ticket)
+    }
+    setReplyText('')
+    setError('')
+  }
+
+  const handleReply = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!replyText.trim() || !activeTicket) return
+    setSending(true); setError('')
+    try {
+      const res = await apiClient.post<SupportMessage>(
+        api(`/support/tickets/${activeTicket.id}/reply/`),
+        { message: replyText.trim() }
+      )
+      setActiveTicket(prev => prev ? { ...prev, messages: [...prev.messages, res.data] } : null)
+      // Refresh ticket list to update status/timestamp
+      loadTickets()
+      setReplyText('')
+    } catch {
+      setError('Failed to send reply.')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const updateStatus = async (ticketId: number, status: string) => {
+    try {
+      await apiClient.patch(api(`/support/tickets/${ticketId}/`), { status })
+      setActiveTicket(prev => prev ? { ...prev, status: status as any } : null)
+      loadTickets()
+    } catch {
+      setError('Failed to update status.')
+    }
+  }
+
+  const openCount = tickets.filter(t => t.status === 'open').length
+
+  if (activeTicket) {
+    return (
+      <div className="flex gap-6 h-[calc(100vh-220px)] min-h-[500px]">
+        {/* Ticket list sidebar */}
+        <div className="w-80 shrink-0 flex flex-col gap-3 overflow-y-auto pr-1">
+          <button
+            onClick={() => setActiveTicket(null)}
+            className="flex items-center gap-2 text-gray-500 hover:text-white text-xs transition mb-1"
+          >
+            <ChevronDown size={13} className="rotate-90" /> Back to all tickets
+          </button>
+          {tickets.map(t => (
+            <button
+              key={t.id}
+              onClick={() => openTicket(t)}
+              className={`w-full text-left p-3.5 rounded-2xl border transition-all ${
+                activeTicket.id === t.id
+                  ? 'bg-white/[0.05] border-white/15'
+                  : 'bg-white/[0.02] border-white/5 hover:border-white/10'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <p className="text-white text-xs font-semibold truncate flex-1">{t.subject}</p>
+                <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border capitalize shrink-0 ${ticketStatusColor[t.status]}`}>
+                  {t.status.replace('_', ' ')}
+                </span>
+              </div>
+              <p className="text-gray-600 text-[10px] truncate">{t.user_name} · {t.user_email}</p>
+              <p className="text-gray-700 text-[10px] mt-0.5">{fmtDate(t.updated_at || t.created_at)}</p>
+            </button>
+          ))}
+        </div>
+
+        {/* Active ticket detail */}
+        <div className="flex-1 bg-white/[0.02] border border-white/6 rounded-2xl flex flex-col overflow-hidden">
+          {/* Ticket header */}
+          <div className="px-5 py-4 border-b border-white/6 shrink-0">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span className="text-gray-600 text-xs">#{activeTicket.id}</span>
+                  <Badge label={activeTicket.status.replace('_', ' ')} color={ticketStatusBadgeColor[activeTicket.status]} />
+                </div>
+                <h3 className="text-white font-bold text-base">{activeTicket.subject}</h3>
+                <p className="text-gray-500 text-xs mt-0.5">
+                  From <span className="text-gray-400 font-semibold">{activeTicket.user_name}</span>
+                  {' '}({activeTicket.user_email}) · {fmtDate(activeTicket.created_at)}
+                </p>
+              </div>
+              {/* Status actions */}
+              <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+                {activeTicket.status === 'open' && (
+                  <ActionBtn label="Mark In Progress" variant="warn" icon={<Clock size={11}/>}
+                    onClick={() => updateStatus(activeTicket.id, 'in_progress')} />
+                )}
+                {(activeTicket.status === 'open' || activeTicket.status === 'in_progress') && (
+                  <ActionBtn label="Resolve" variant="success" icon={<CheckCircle2 size={11}/>}
+                    onClick={() => updateStatus(activeTicket.id, 'resolved')} />
+                )}
+                {activeTicket.status !== 'closed' && (
+                  <ActionBtn label="Close" variant="danger" icon={<X size={11}/>}
+                    onClick={() => updateStatus(activeTicket.id, 'closed')} />
+                )}
+                {activeTicket.status === 'closed' && (
+                  <ActionBtn label="Reopen" variant="success" icon={<RefreshCw size={11}/>}
+                    onClick={() => updateStatus(activeTicket.id, 'open')} />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            {activeTicket.messages.length === 0 ? (
+              <p className="text-gray-700 text-xs text-center py-8">No messages yet</p>
+            ) : activeTicket.messages.map(msg => (
+              <div key={msg.id} className={`flex ${msg.is_from_user ? 'justify-start' : 'justify-end'}`}>
+                <div className={`max-w-[72%] rounded-2xl px-4 py-3 ${
+                  msg.is_from_user
+                    ? 'bg-white/[0.04] border border-white/8 rounded-tl-md'
+                    : 'bg-red-600/15 border border-red-500/20 rounded-tr-md'
+                }`}>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className={`text-[9px] font-black uppercase tracking-wider ${msg.is_from_user ? 'text-gray-600' : 'text-red-400'}`}>
+                      {msg.is_from_user ? 'User' : (msg.admin_name || 'Admin')}
+                    </span>
+                    <span className="text-[9px] text-gray-700">{fmtTime(msg.created_at)}</span>
+                  </div>
+                  <p className="text-white text-sm leading-relaxed">{msg.message}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Reply box */}
+          {activeTicket.status !== 'closed' ? (
+            <div className="border-t border-white/6 p-4 shrink-0">
+              {error && <p className="text-red-400 text-xs mb-2">{error}</p>}
+              <form onSubmit={handleReply} className="flex gap-3">
+                <input
+                  type="text"
+                  value={replyText}
+                  onChange={e => setReplyText(e.target.value)}
+                  placeholder="Type your reply to the user..."
+                  className="flex-1 px-4 py-3 bg-white/4 border border-white/8 rounded-xl text-white text-sm placeholder-gray-700 focus:outline-none focus:border-red-500/40 transition"
+                />
+                <button
+                  type="submit"
+                  disabled={sending || !replyText.trim()}
+                  className="px-5 py-3 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white text-sm font-bold rounded-xl transition flex items-center gap-2 shrink-0"
+                >
+                  {sending ? <Loader2 size={14} className="animate-spin" /> : <><Send size={13} /><span>Reply</span></>}
+                </button>
+              </form>
+            </div>
+          ) : (
+            <div className="border-t border-white/6 px-5 py-3 shrink-0">
+              <p className="text-gray-600 text-xs text-center">This ticket is closed. Reopen it to reply.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {/* Filter tabs + open count */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex gap-2 flex-wrap">
+          {(['open', 'in_progress', 'resolved', 'closed', 'all'] as const).map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition ${
+                filter === f ? 'bg-red-600 text-white' : 'bg-white/4 border border-white/8 text-gray-500 hover:text-white hover:border-white/15'
+              }`}>
+              {f.replace('_', ' ')}
+              {f === 'open' && openCount > 0 && (
+                <span className="ml-1.5 bg-amber-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded-full">
+                  {openCount}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        <button onClick={loadTickets} className="text-gray-600 hover:text-gray-400 transition">
+          <RefreshCw size={14} />
+        </button>
+      </div>
+
+      {loading ? <Loader /> : tickets.length === 0 ? <Empty text={`No ${filter.replace('_', ' ')} tickets`} /> : (
+        <div className="space-y-3">
+          {tickets.map(ticket => (
+            <motion.div key={ticket.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+              className="bg-white/[0.02] border border-white/6 hover:border-white/10 rounded-2xl p-5 cursor-pointer transition-all group"
+              onClick={() => openTicket(ticket)}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className="text-gray-600 text-[10px]">#{ticket.id}</span>
+                    <Badge label={ticket.status.replace('_', ' ')} color={ticketStatusBadgeColor[ticket.status]} />
+                  </div>
+                  <p className="text-white font-bold text-sm mb-0.5">{ticket.subject}</p>
+                  <p className="text-gray-500 text-xs">
+                    <span className="text-gray-400">{ticket.user_name}</span> · {ticket.user_email}
+                  </p>
+                  <p className="text-gray-700 text-xs mt-1">{fmtDate(ticket.created_at)}</p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  {ticket.status === 'open' && (
+                    <motion.span animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 2, repeat: Infinity }}
+                      className="w-2 h-2 rounded-full bg-amber-400 block" />
+                  )}
+                  <ChevronRight size={14} className="text-gray-700 group-hover:text-gray-400 transition" />
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── OTHER TABS (unchanged) ───────────────────────────────────────────────────
 
 function DashboardTab({ setTab }: { setTab: (t: Tab) => void }) {
   const [stats, setStats] = useState<DashStats | null>(null)
@@ -502,38 +784,87 @@ function NotificationsTab() {
   )
 }
 
+// ── TAB REGISTRY ─────────────────────────────────────────────────────────────
+
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={15}/> },
-  { id: 'venue-owners', label: 'Venue Owners', icon: <UserCheck size={15}/> },
-  { id: 'users', label: 'Customers', icon: <Users size={15}/> },
-  { id: 'events', label: 'Events', icon: <CalendarDays size={15}/> },
-  { id: 'shows', label: 'Shows', icon: <Play size={15}/> },
-  { id: 'bookings', label: 'Bookings', icon: <Ticket size={15}/> },
-  { id: 'revenue', label: 'Revenue', icon: <BarChart3 size={15}/> },
-  { id: 'fraud', label: 'Fraud', icon: <ShieldAlert size={15}/> },
-  { id: 'notifications', label: 'Notify', icon: <Bell size={15}/> },
+  { id: 'dashboard',     label: 'Dashboard',    icon: <LayoutDashboard size={15}/> },
+  { id: 'venue-owners',  label: 'Venue Owners', icon: <UserCheck size={15}/> },
+  { id: 'users',         label: 'Customers',    icon: <Users size={15}/> },
+  { id: 'events',        label: 'Events',       icon: <CalendarDays size={15}/> },
+  { id: 'shows',         label: 'Shows',        icon: <Play size={15}/> },
+  { id: 'bookings',      label: 'Bookings',     icon: <Ticket size={15}/> },
+  { id: 'revenue',       label: 'Revenue',      icon: <BarChart3 size={15}/> },
+  { id: 'fraud',         label: 'Fraud',        icon: <ShieldAlert size={15}/> },
+  { id: 'notifications', label: 'Notify',       icon: <Bell size={15}/> },
+  { id: 'support',       label: 'Support',      icon: <MessageCircle size={15}/> },
 ]
+
+const TAB_DESCRIPTIONS: Record<Tab, string> = {
+  'dashboard':     'Platform overview and key metrics',
+  'venue-owners':  'Approve, reject or ban venue owner accounts',
+  'users':         'Manage all customers',
+  'events':        'Moderate and approve events before publishing',
+  'shows':         'Cancel or modify show timings',
+  'bookings':      'View and manage all bookings',
+  'revenue':       'Platform revenue and transaction analytics',
+  'fraud':         'Detect suspicious booking patterns',
+  'notifications': 'Send platform-wide announcements',
+  'support':       'View and respond to user support tickets',
+}
+
+// ── PAGE ─────────────────────────────────────────────────────────────────────
 
 export default function AdminPanelPage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [tab, setTab] = useState<Tab>('dashboard')
+  // Track open support ticket count for sidebar badge
+  const [openSupportCount, setOpenSupportCount] = useState(0)
 
   useEffect(() => {
-    fetch('/api/auth/me').then(res => { if (!res.ok) { router.push('/login'); return null } return res.json() }).then(parsed => { if (!parsed) return; if (parsed.role !== 'Admin') { router.push('/'); return }; setUser(parsed) }).catch(() => router.push('/login'))
+    fetch('/api/auth/me')
+      .then(res => { if (!res.ok) { router.push('/login'); return null } return res.json() })
+      .then(parsed => { if (!parsed) return; if (parsed.role !== 'Admin') { router.push('/'); return }; setUser(parsed) })
+      .catch(() => router.push('/login'))
   }, [])
 
-  const handleLogout = async () => { await fetch('/api/auth/logout', { method: 'POST' }); router.push('/login'); window.dispatchEvent(new Event('authChange')) }
+  // Poll open ticket count for the sidebar badge
+  useEffect(() => {
+    if (!user) return
+    const fetch_ = () => {
+      apiClient.get(api('/support/tickets/?status=open'))
+        .then(r => setOpenSupportCount(Array.isArray(r.data) ? r.data.length : 0))
+        .catch(() => {})
+    }
+    fetch_()
+    const interval = setInterval(fetch_, 60_000) // refresh every minute
+    return () => clearInterval(interval)
+  }, [user])
+
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    router.push('/login')
+    window.dispatchEvent(new Event('authChange'))
+  }
 
   if (!user) return (
     <div className="min-h-screen bg-[#070710] flex items-center justify-center">
-      <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} className="w-6 h-6 border-2 border-red-600 border-t-transparent rounded-full" />
+      <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+        className="w-6 h-6 border-2 border-red-600 border-t-transparent rounded-full" />
     </div>
   )
 
   const tabContent: Record<Tab, React.ReactNode> = {
-    'dashboard': <DashboardTab setTab={setTab} />, 'venue-owners': <VenueOwnersTab />, 'users': <UsersTab />, 'events': <EventsTab />,
-    'shows': <ShowsTab />, 'bookings': <BookingsTab />, 'revenue': <RevenueTab />, 'fraud': <FraudTab />, 'notifications': <NotificationsTab />,
+    'dashboard':     <DashboardTab setTab={setTab} />,
+    'venue-owners':  <VenueOwnersTab />,
+    'users':         <UsersTab />,
+    'events':        <EventsTab />,
+    'shows':         <ShowsTab />,
+    'bookings':      <BookingsTab />,
+    'revenue':       <RevenueTab />,
+    'fraud':         <FraudTab />,
+    'notifications': <NotificationsTab />,
+    'support':       <SupportTab />,
   }
 
   return (
@@ -559,8 +890,19 @@ export default function AdminPanelPage() {
         <nav className="flex-1 py-4 px-3 space-y-0.5 overflow-y-auto">
           {TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] transition text-left ${tab === t.id ? 'bg-red-600/15 text-red-400 font-bold border border-red-500/15' : 'text-gray-600 hover:text-gray-300 hover:bg-white/[0.03]'}`}>
-              {t.icon}{t.label}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] transition text-left ${
+                tab === t.id
+                  ? 'bg-red-600/15 text-red-400 font-bold border border-red-500/15'
+                  : 'text-gray-600 hover:text-gray-300 hover:bg-white/[0.03]'
+              }`}>
+              {t.icon}
+              <span className="flex-1">{t.label}</span>
+              {/* Badge for open support tickets */}
+              {t.id === 'support' && openSupportCount > 0 && (
+                <span className="bg-amber-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                  {openSupportCount}
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -586,17 +928,7 @@ export default function AdminPanelPage() {
             <h1 className="text-3xl font-black text-white tracking-tight capitalize" style={{ fontFamily: "'Georgia', serif" }}>
               {TABS.find(t => t.id === tab)?.label}
             </h1>
-            <p className="text-gray-700 text-sm mt-0.5">
-              {tab === 'dashboard' && 'Platform overview and key metrics'}
-              {tab === 'venue-owners' && 'Approve, reject or ban venue owner accounts'}
-              {tab === 'users' && 'Manage all customers'}
-              {tab === 'events' && 'Moderate and approve events before publishing'}
-              {tab === 'shows' && 'Cancel or modify show timings'}
-              {tab === 'bookings' && 'View and manage all bookings'}
-              {tab === 'revenue' && 'Platform revenue and transaction analytics'}
-              {tab === 'fraud' && 'Detect suspicious booking patterns'}
-              {tab === 'notifications' && 'Send platform-wide announcements'}
-            </p>
+            <p className="text-gray-700 text-sm mt-0.5">{TAB_DESCRIPTIONS[tab]}</p>
           </div>
           <AnimatePresence mode="wait">
             <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.15 }}>
