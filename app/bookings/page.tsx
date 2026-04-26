@@ -148,13 +148,29 @@ function BookingsContent() {
 
   const groupedByEvent = () => {
     const groups: Record<string, { eventTitle: string; eventType: string; bookings: Booking[] }> = {}
+    
     bookings.forEach(b => {
       const eventId = String((b as any).show_details?.event?.id || (b as any).show || 'unknown')
       const eventTitle = (b as any).show_details?.event?.title || `Show #${(b as any).show}`
       const eventType = (b as any).show_details?.event?.event_type || ''
-      if (!groups[eventId]) groups[eventId] = { eventTitle, eventType, bookings: [] }
+    
+      if (!groups[eventId]) {
+        groups[eventId] = { eventTitle, eventType, bookings: [] }
+      }
+    
+      // ✅ ADD THIS (MISSING LINE)
       groups[eventId].bookings.push(b)
     })
+  
+    // ✅ SORT AFTER ADDING
+    Object.values(groups).forEach(group => {
+      group.bookings.sort(
+        (a, b) =>
+          new Date(a.booking_time).getTime() -
+          new Date(b.booking_time).getTime()
+      )
+    })
+  
     return groups
   }
 
