@@ -9,10 +9,20 @@ async function handler(
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   const { path } = await params
-  const pathStr = path.join('/')
+
+  // ✅ FIXED: define pathStr properly
+  let pathStr = path.join('/')
+
+  // ✅ Only fix trailing slash for support routes
+  if (pathStr.startsWith('users/support/tickets')) {
+    if (!pathStr.endsWith('/')) {
+      pathStr += '/'
+    }
+  }
+
   const token = req.cookies.get('authToken')?.value
   const search = req.nextUrl.search || ''
-  const url = `${DJANGO}/${pathStr}/${search}`
+  const url = `${DJANGO}/${pathStr}${search}`
 
   const headers: Record<string, string> = {}
   if (token) headers['Authorization'] = `Bearer ${token}`
@@ -20,16 +30,13 @@ async function handler(
   const contentType = req.headers.get('content-type') || ''
   const isMultipart = contentType.includes('multipart/form-data')
 
-  // For multipart: forward the content-type WITH boundary intact
-  // For everything else: forward as-is
   if (contentType) {
-    headers['Content-Type'] = contentType  // ← always forward, including multipart+boundary
+    headers['Content-Type'] = contentType
   }
 
   let body: BodyInit | undefined
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     if (isMultipart) {
-      // Stream the body directly — buffering can corrupt multipart boundaries
       body = req.body ?? undefined
     } else {
       const ab = await req.arrayBuffer()
@@ -42,8 +49,8 @@ async function handler(
       method: req.method,
       headers,
       body,
-      cache: 'no-store',          // 🔥 VERY IMPORTANT
-      next: { revalidate: 0 },    // 🔥 disable Next.js caching
+      cache: 'no-store',
+      next: { revalidate: 0 },
       // @ts-ignore
       duplex: 'half',
     })
@@ -53,7 +60,7 @@ async function handler(
       status: res.status,
       headers: {
         'Content-Type': res.headers.get('content-type') || 'application/json',
-        'Cache-Control': 'no-store',   // 🔥 prevents browser caching
+        'Cache-Control': 'no-store',
       },
     })
   } catch (err) {
@@ -65,4 +72,11 @@ async function handler(
   }
 }
 
-export { handler as GET, handler as POST, handler as PUT, handler as PATCH, handler as DELETE, handler as OPTIONS }
+export {
+  handler as GET,
+  handler as POST,
+  handler as PUT,
+  handler as PATCH,
+  handler as DELETE,
+  handler as OPTIONS,
+}
