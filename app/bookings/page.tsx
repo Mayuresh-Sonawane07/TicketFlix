@@ -346,7 +346,7 @@ function BookingsContent() {
                               <div className="flex items-start justify-between mb-3">
                                 <div>
                                   <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-white font-mono text-sm font-bold">#{booking.id}</span>
+                                    <span className="text-white font-mono text-sm font-bold">#{i + 1}</span>
                                     <StatusBadge status={booking.status} />
                                   </div>
                                   <div className="space-y-1 text-gray-600 text-xs">
