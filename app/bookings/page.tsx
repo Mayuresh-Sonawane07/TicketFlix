@@ -236,7 +236,7 @@ function BookingsContent() {
                             <div key={booking.id} className={`px-5 py-4 flex items-center justify-between ${i < group.bookings.length - 1 ? 'border-b border-white/4' : ''}`}>
                               <div>
                                 <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-gray-300 text-sm font-mono font-medium">#{booking.id}</span>
+                                  <span className="text-gray-300 text-sm font-mono font-medium">#{i + 1}</span>
                                   <StatusBadge status={booking.status} />
                                 </div>
                                 <div className="flex items-center gap-3 text-gray-600 text-xs">
