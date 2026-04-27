@@ -53,6 +53,7 @@ export default function RegisterPage() {
     password: '',
     confirmPassword: '',
     role: 'Customer' as Role,
+    // Venue owner extra fields
     business_name: '',
     business_address: '',
     business_city: '',
@@ -79,6 +80,7 @@ export default function RegisterPage() {
     if (form.password.length < 6) return 'Password must be at least 6 characters.'
     if (form.password !== form.confirmPassword) return 'Passwords do not match.'
     if (!agreedToTerms) return 'Please agree to the Terms & Privacy Policy.'
+    // Venue owner specific
     if (form.role === 'VENUE_OWNER') {
       if (!form.business_name.trim()) return 'Business / venue name is required.'
       if (!form.business_address.trim()) return 'Business address is required.'
@@ -100,6 +102,7 @@ export default function RegisterPage() {
         phone_number: form.phone_number,
         password: form.password,
         role: form.role,
+        // venue owner fields sent as extra — backend stores in profile/serializer
         ...(form.role === 'VENUE_OWNER' && {
           business_name: form.business_name,
           business_address: form.business_address,
@@ -141,34 +144,21 @@ export default function RegisterPage() {
     e.preventDefault()
     setLoading(true); setError(''); setSuccess('')
     try {
-      // Step 1: verify OTP (marks email as verified on backend)
       await authAPI.verifyOTP({ email: form.email, otp })
 
-      // Step 2: log in to get a session/cookies so support chat works
-      // For venue owners this sets cookies but middleware will enforce
-      // the pending-approval redirect for any protected route they visit.
-      const loginRes = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: form.email, password: form.password }),
-      })
-      const loginData = await loginRes.json()
-
       if (form.role === 'VENUE_OWNER') {
-        // Login may fail (unlikely) but we still redirect to pending-approval.
-        // If login succeeded, cookies are set and support chat will work.
-        // The middleware blocks venue-dashboard until is_approved = true.
-        if (!loginRes.ok) {
-          console.warn('[register] Login after OTP failed — support chat will require manual sign-in')
-        } else {
-          window.dispatchEvent(new Event('authChange'))
-        }
+        // Don't auto-login venue owners — redirect to pending page
         router.push('/pending-approval')
         return
       }
 
-      // Customer — login must succeed
-      if (!loginRes.ok) { setError(loginData.error || 'Login failed'); return }
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email, password: form.password }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error || 'Login failed'); return }
       window.dispatchEvent(new Event('authChange'))
       router.push('/')
     } catch (err: any) {
@@ -295,7 +285,7 @@ export default function RegisterPage() {
                       )}
                     </AnimatePresence>
 
-                    {/* Personal Info */}
+                    {/* ── PERSONAL INFO ── */}
                     <Field label="Full Name" icon={User} name="name" focusedField={focusedField}>
                       <input name="name" type="text" required value={form.name} onChange={handleChange}
                         onFocus={() => focus('name')} onBlur={blur} placeholder="John Doe" disabled={loading}
@@ -324,6 +314,7 @@ export default function RegisterPage() {
                       <p className="text-gray-700 text-[10px] mt-1.5 px-1">Each phone number can only be used for one account.</p>
                     </div>
 
+                    {/* Password */}
                     <Field label="Password" icon={Lock} name="password" focusedField={focusedField}>
                       <input name="password" type={showPassword ? 'text' : 'password'} required value={form.password}
                         onChange={handleChange} onFocus={() => focus('password')} onBlur={blur}
@@ -362,12 +353,13 @@ export default function RegisterPage() {
                       <p className="text-red-400 text-xs -mt-2 px-1">Passwords don't match</p>
                     )}
 
-                    {/* Venue Owner Extra Fields */}
+                    {/* ── VENUE OWNER EXTRA FIELDS ── */}
                     <AnimatePresence>
                       {isVenueOwner && (
                         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
                           exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
                           <div className="pt-2 space-y-4">
+                            {/* Section divider */}
                             <div className="flex items-center gap-3">
                               <div className="flex-1 h-px bg-white/6" />
                               <span className="text-[10px] font-black text-gray-700 uppercase tracking-widest">Business Details</span>
@@ -404,6 +396,7 @@ export default function RegisterPage() {
                               </Field>
                             </div>
 
+                            {/* Optional fields */}
                             <div className="flex items-center gap-3">
                               <div className="flex-1 h-px bg-white/6" />
                               <span className="text-[10px] font-black text-gray-700 uppercase tracking-widest">Optional</span>

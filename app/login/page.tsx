@@ -50,25 +50,32 @@ export default function Login() {
   const initializeGoogle = () => {
     const el = document.getElementById('google-btn')
     if (!window.google || !el) return false
+
     window.google.accounts.id.initialize({
       client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
       callback: handleGoogleResponse,
-    })
-    el.innerHTML = ''
+   })
+
+    el.innerHTML = '' // prevent duplicate render
+
     window.google.accounts.id.renderButton(el, {
-      theme: 'filled_black',
+      theme: 'filled_black',   // 🔥 better for your dark UI
       size: 'large',
       shape: 'pill',
       width: 350,
       text: 'continue_with',
     })
+
     return true
   }
 
   useEffect(() => {
     const interval = setInterval(() => {
-      if (initializeGoogle()) clearInterval(interval)
+      if (initializeGoogle()) {
+        clearInterval(interval)
+      }
     }, 300)
+  
     return () => clearInterval(interval)
   }, [])
 
@@ -86,17 +93,13 @@ export default function Login() {
     return err?.response?.data?.error || 'Login failed. Please try again.'
   }
 
-  // Centralised post-login routing — unapproved venue owners always go to /pending-approval
   const handleLoginSuccess = (user: any) => {
     window.dispatchEvent(new Event('authChange'))
-    if (user.role === 'Admin') {
-      router.push('/admin-panel')
-    } else if (user.role === 'VENUE_OWNER') {
+    if (user.role === 'Admin') router.push('/admin-panel')
+    else if (user.role === 'VENUE_OWNER') {
       if (user.is_approved) router.push('/venue-dashboard')
-      else router.push('/pending-approval')   // ← was /?notice=pending_approval
-    } else {
-      router.push('/')
-    }
+      else router.push('/?notice=pending_approval')
+    } else router.push('/')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -123,8 +126,7 @@ export default function Login() {
   }
 
   const handleGoogleResponse = async (response: any) => {
-    setError(null)
-    setIsGoogleLoading(true)
+    setError(null); setIsGoogleLoading(true)
     try {
       const res = await fetch('/api/auth/google', {
         method: 'POST',
@@ -132,29 +134,15 @@ export default function Login() {
         body: JSON.stringify({ google_token: response.credential }),
       })
       const data = await res.json()
-
-      // Unapproved venue owner — backend issued no cookies, redirect to pending page
-      if (res.status === 403 && data.error === 'pending_approval') {
-        router.push('/pending-approval')
-        return
-      }
-
-      if (!res.ok) {
-        setError(data.error || data.detail || 'Google login failed.')
-        return
-      }
-
+      if (!res.ok) { setError(data.error || 'Google login failed'); return }
       handleLoginSuccess(data.user)
-    } catch {
-      setError('Google login failed. Please try again.')
-    } finally {
-      setIsGoogleLoading(false)
-    }
+    } catch { setError('Google login failed.') }
+    finally { setIsGoogleLoading(false) }
   }
 
   const floatingData = FLOATING_ITEMS.map((e, i) => ({
     emoji: e, x: 5 + (i * 13) % 90, y: 10 + (i * 17) % 80,
-    delay: i * 0.8, duration: 5 + (i % 3) * 2,
+    delay: i * 0.8, duration: 5 + (i % 3) * 2
   }))
 
   return (
@@ -165,10 +153,9 @@ export default function Login() {
 
         {/* Background atmosphere */}
         <div className="absolute inset-0 pointer-events-none">
-          <motion.div animate={{ x: [0, 30, 0], y: [0, -20, 0] }} transition={{ duration: 15, repeat: Infinity }}
-            className="absolute top-0 left-1/4 w-[500px] h-[500px] rounded-full bg-red-900/15 blur-[100px]" />
-          <motion.div animate={{ x: [0, -20, 0], y: [0, 30, 0] }} transition={{ duration: 20, repeat: Infinity, delay: 3 }}
-            className="absolute bottom-0 right-1/4 w-[400px] h-[400px] rounded-full bg-orange-900/10 blur-[100px]" />
+          <motion.div animate={{ x: [0, 30, 0], y: [0, -20, 0] }} transition={{ duration: 15, repeat: Infinity }} className="absolute top-0 left-1/4 w-[500px] h-[500px] rounded-full bg-red-900/15 blur-[100px]" />
+          <motion.div animate={{ x: [0, -20, 0], y: [0, 30, 0] }} transition={{ duration: 20, repeat: Infinity, delay: 3 }} className="absolute bottom-0 right-1/4 w-[400px] h-[400px] rounded-full bg-orange-900/10 blur-[100px]" />
+          {/* Grid */}
           <div className="absolute inset-0 opacity-[0.02]" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
           {floatingData.map((f, i) => <FloatingIcon key={i} {...f} />)}
         </div>
@@ -176,11 +163,9 @@ export default function Login() {
         <div className="w-full max-w-md relative z-10">
 
           {/* Logo */}
-          <motion.div initial={{ opacity: 0, y: -30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
-            className="text-center mb-10">
+          <motion.div initial={{ opacity: 0, y: -30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="text-center mb-10">
             <Link href="/" className="inline-flex items-center gap-3 group">
-              <motion.div whileHover={{ rotate: [0, -10, 10, 0] }} transition={{ duration: 0.4 }}
-                className="relative w-10 h-10 flex items-center justify-center">
+              <motion.div whileHover={{ rotate: [0, -10, 10, 0] }} transition={{ duration: 0.4 }} className="relative w-10 h-10 flex items-center justify-center">
                 <div className="absolute inset-0 bg-red-600 rounded-xl rotate-6 group-hover:rotate-12 transition-transform duration-300" />
                 <Film size={20} className="relative text-white" />
               </motion.div>
@@ -199,9 +184,11 @@ export default function Login() {
             transition={{ duration: 0.6, delay: 0.1, ease: [0.23, 1, 0.32, 1] }}
             className="relative"
           >
+            {/* Card glow */}
             <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-red-600/10 via-transparent to-orange-600/5 blur-xl" />
 
             <div className="relative bg-[#0f0f0f]/90 backdrop-blur-xl border border-white/8 rounded-3xl overflow-hidden">
+              {/* Top accent line */}
               <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-red-500/60 to-transparent" />
 
               <div className="p-8">
@@ -218,9 +205,7 @@ export default function Login() {
                 {/* Error */}
                 <AnimatePresence>
                   {error && (
-                    <motion.div initial={{ opacity: 0, y: -10, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }}
-                      exit={{ opacity: 0, y: -10, height: 0 }}
-                      className="mb-5 p-4 bg-red-500/8 border border-red-500/20 rounded-2xl flex items-start gap-3">
+                    <motion.div initial={{ opacity: 0, y: -10, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -10, height: 0 }} className="mb-5 p-4 bg-red-500/8 border border-red-500/20 rounded-2xl flex items-start gap-3">
                       <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 shrink-0" />
                       <p className="text-red-300 text-sm leading-relaxed">{error}</p>
                     </motion.div>
@@ -254,26 +239,21 @@ export default function Login() {
                         placeholder="••••••••" disabled={isLoading}
                         className="w-full pl-11 pr-12 py-3.5 bg-transparent text-white placeholder-gray-700 text-sm focus:outline-none"
                       />
-                      <button type="button" onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-300 transition-colors">
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-300 transition-colors">
                         {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                       </button>
                     </div>
                   </motion.div>
 
                   {/* Remember + Forgot */}
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45 }}
-                    className="flex items-center justify-between">
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45 }} className="flex items-center justify-between">
                     <label className="flex items-center gap-2 cursor-pointer group">
-                      <div className={`w-4 h-4 rounded-md border-2 flex items-center justify-center transition-all ${rememberMe ? 'bg-red-600 border-red-600' : 'border-white/20 group-hover:border-white/40'}`}
-                        onClick={() => setRememberMe(!rememberMe)}>
+                      <div className={`w-4 h-4 rounded-md border-2 flex items-center justify-center transition-all ${rememberMe ? 'bg-red-600 border-red-600' : 'border-white/20 group-hover:border-white/40'}`} onClick={() => setRememberMe(!rememberMe)}>
                         {rememberMe && <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-2 h-2 bg-white rounded-sm" />}
                       </div>
                       <span className="text-gray-500 text-xs">Remember me</span>
                     </label>
-                    <Link href="/forgot-password" className="text-red-500 hover:text-red-400 text-xs font-semibold transition-colors">
-                      Forgot password?
-                    </Link>
+                    <Link href="/forgot-password" className="text-red-500 hover:text-red-400 text-xs font-semibold transition-colors">Forgot password?</Link>
                   </motion.div>
 
                   {/* Submit */}
@@ -284,8 +264,7 @@ export default function Login() {
                       className="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-2xl transition-all duration-200 flex items-center justify-center gap-2 text-sm disabled:opacity-50 mt-2"
                     >
                       {isLoading ? (
-                        <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.7, repeat: Infinity }}
-                          className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
+                        <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.7, repeat: Infinity }} className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
                       ) : (
                         <><span>Sign In</span><ArrowRight size={15} /></>
                       )}
@@ -302,11 +281,18 @@ export default function Login() {
 
                 {/* Google */}
                 <div className="w-full flex justify-center bg-white/5 border border-white/10 rounded-2xl p-2 min-h-[50px] items-center relative">
+
+                  {/* ✅ ALWAYS present */}
                   <div id="google-btn" />
+
+                  {/* ✅ overlay loader */}
                   {isGoogleLoading && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-2xl">
-                      <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.7, repeat: Infinity }}
-                        className="w-4 h-4 border-2 border-white/20 border-t-white/60 rounded-full mr-2" />
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 0.7, repeat: Infinity }}
+                        className="w-4 h-4 border-2 border-white/20 border-t-white/60 rounded-full mr-2"
+                      />
                       <span className="text-gray-400 text-sm">Signing in with Google...</span>
                     </div>
                   )}
